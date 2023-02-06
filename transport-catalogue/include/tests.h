@@ -1,9 +1,9 @@
 #ifndef TESTS_H
 #define TESTS_H
 
+#include "filesystem"
 #include "include/log_duration.h"
 #include "include/test_framework.h"
-#include "include/input_reader.h"
 
 namespace tc {
 
@@ -31,7 +31,15 @@ namespace tc {
 
         void TestParseDistances();
 
-        void Test(std::filesystem::path test_path, std::filesystem::path standard_path, std::ostream& out_logs = std::cout);
+        void TestSetDistance();
+
+        void TestJSON();
+
+        void TestTxtFiles(std::filesystem::path test_path, std::filesystem::path standard_path, std::ostream& out_logs = std::cout);
+
+        void TestJsonFiles(std::filesystem::path test_path, std::filesystem::path standard_path, std::ostream& out_logs = std::cout);
+
+        void TestSvgFiles(std::filesystem::path test_path, std::filesystem::path standard_path, std::ostream& out_logs);
 
         void TestProject();
     }

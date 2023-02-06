@@ -2,63 +2,81 @@
 #include <fstream>
 #include <filesystem>
 #include "include/tests.h"
-#include "include/input_reader.h"
 #include "include/stat_reader.h"
+#include "include/svg.h"
 
 
 using namespace std;
 using namespace std::filesystem;
-
+using namespace svg;
 using namespace tc;
 
 
 int main(){
 
 #ifndef NDEBUG
-    tests::TestProject();
-
-    std::string out_path = "../test_result.log";
-    std::ofstream out_logs(out_path);
-    if(out_logs.is_open()){
-
-        TestRunner test;
-        auto tsC_case1 = [&](){ tests::Test("../tests/tsC_case/tsC_case1_input.txt"s, "../tests/tsC_case/tsC_case1_output1.txt"s, out_logs); };
-        RUN_TEST(test, tsC_case1);
-        //auto tsC_case2 = [&](){ Test("../tests/tsC_case/tsC_case1_input.txt"s, "../tests/tsC_case/tsC_case1_output2.txt"s, out_logs); };
-        //RUN_TEST(test, tsC_case2);
-
-    }else{
-        std::cerr << "Ошибка: Log файл " << out_path << " не открыт " << std::endl;
-    }
-#endif
-
 
     {
-        path test_path = "../tests/example.txt"s;
-        TransportCatalogue catalogue;
+        LOG_DURATION("TestProject");
+        tests::TestProject();
+    }
+    std::string out_path = "../test_difference.log";
+    std::filesystem::remove(out_path);
+    std::ofstream out_logs(out_path, std::ios::app);
+    {
 
-        path result_path = test_path.root_path().string().append("tests_result").append(test_path.stem()).append("_result.log");
-         std::vector<std::pair<QueryType, std::string>> queries;
-        std::ifstream in(test_path);
-        if(in.is_open()){
-            detail::ParseTxt(in, catalogue);
-            queries = ParseOutputQuery(in);
+        if(out_logs.is_open()){
+
+            TestRunner test;
+            auto tsC_case1 = [&](){ tests::TestTxtFiles("../tests/tsC_case/tsC_case1_input.txt"s, "../tests/tsC_case/tsC_case1_output1.txt"s, out_logs); };
+            RUN_TEST(test, tsC_case1);
+
         }else{
-            std::cout << " Файл " << test_path.string() << " не открыт " << std::endl;
+            std::cerr << "Ошибка: Log файл " << out_path << " не открыт " << std::endl;
         }
 
-        for(auto& [type ,query] : queries){
-            PrintQuery(type, query, catalogue);
+    }
+
+    {
+        if(out_logs.is_open()){
+            TestRunner test;
+            auto example1 = [&](){ tests::TestJsonFiles("../examples/example1/example1.json"s, "../examples/example1/output1.json"s, out_logs); };
+            RUN_TEST(test, example1);
+
+        }else{
+            std::cerr << "Ошибка: Log файл " << out_path << " не открыт " << std::endl;
         }
     }
 
+    {
+        if(out_logs.is_open()){
+            TestRunner test;
+            auto example2 = [&](){ tests::TestJsonFiles("../examples/example2/example2.json"s, "../examples/example2/output2.json"s, out_logs); };
+            RUN_TEST(test, example2);
+
+        }else{
+            std::cerr << "Ошибка: Log файл " << out_path << " не открыт " << std::endl;
+        }
+    }
+
+    {
+        if(out_logs.is_open()){
+            TestRunner test;
+            auto example3 = [&](){ tests::TestSvgFiles("../examples/example3/example3.json"s, "../examples/example3/output3.svg"s, out_logs); };
+            RUN_TEST(test, example3);
+
+        }else{
+            std::cerr << "Ошибка: Log файл " << out_path << " не открыт " << std::endl;
+        }
+    }
+    out_logs.close();
+#endif
 
     TransportCatalogue catalogue;
-    ReadByConsole(catalogue);
-    auto queries = ParseOutputQuery(std::cin);
-    for(auto& [type ,query] : queries){
-        PrintQuery(type, query, catalogue);
-    }
+    // auto [out, settings] = ReadFile("../input.json"s, catalogue);
+    auto [out, settings] = detail::ParseJson(std::cin, catalogue);
+    MapRenderer render(catalogue, settings);
+    PrintQuery(out, catalogue, render, std::cout);
     return 0;
-
 }
+

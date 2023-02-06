@@ -53,13 +53,23 @@ OBJECTS_DIR   = ./
 ####### Files
 
 SOURCES       = ../main.cpp \
-		../src/input_reader.cpp \
+		../src/domain.cpp \
+		../src/geo.cpp \
+		../src/json.cpp \
+		../src/map_renderer.cpp \
+		../src/request_handler.cpp \
 		../src/stat_reader.cpp \
+		../src/svg.cpp \
 		../src/tests.cpp \
 		../src/transport_catalogue.cpp 
 OBJECTS       = main.o \
-		input_reader.o \
+		domain.o \
+		geo.o \
+		json.o \
+		map_renderer.o \
+		request_handler.o \
 		stat_reader.o \
+		svg.o \
 		tests.o \
 		transport_catalogue.o
 DIST          = ../../../../Qt5.12.12/5.12.12/gcc_64/mkspecs/features/spec_pre.prf \
@@ -250,15 +260,24 @@ DIST          = ../../../../Qt5.12.12/5.12.12/gcc_64/mkspecs/features/spec_pre.p
 		../../../../Qt5.12.12/5.12.12/gcc_64/mkspecs/features/exceptions.prf \
 		../../../../Qt5.12.12/5.12.12/gcc_64/mkspecs/features/yacc.prf \
 		../../../../Qt5.12.12/5.12.12/gcc_64/mkspecs/features/lex.prf \
-		../../TransportCatalogue.pro include/geo.h \
-		include/input_reader.h \
+		../../TransportCatalogue.pro include/domain.h \
+		include/geo.h \
+		include/json.h \
 		include/log_duration.h \
+		include/map_renderer.h \
+		include/request_handler.h \
 		include/stat_reader.h \
+		include/svg.h \
 		include/test_framework.h \
 		include/tests.h \
 		include/transport_catalogue.h ../main.cpp \
-		../src/input_reader.cpp \
+		../src/domain.cpp \
+		../src/geo.cpp \
+		../src/json.cpp \
+		../src/map_renderer.cpp \
+		../src/request_handler.cpp \
 		../src/stat_reader.cpp \
+		../src/svg.cpp \
 		../src/tests.cpp \
 		../src/transport_catalogue.cpp
 QMAKE_TARGET  = TransportCatalogue
@@ -696,32 +715,70 @@ compiler_clean:
 main.o: ../main.cpp ../include/tests.h \
 		../include/log_duration.h \
 		../include/test_framework.h \
-		../include/input_reader.h \
+		../include/stat_reader.h \
+		../include/request_handler.h \
 		../include/transport_catalogue.h \
-		../include/geo.h
+		../include/domain.h \
+		../include/geo.h \
+		../include/json.h \
+		../include/map_renderer.h \
+		../include/svg.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o ../main.cpp
 
-input_reader.o: ../src/input_reader.cpp ../include/input_reader.h \
-		../include/transport_catalogue.h \
+domain.o: ../src/domain.cpp ../include/domain.h \
 		../include/geo.h
-	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o input_reader.o ../src/input_reader.cpp
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o domain.o ../src/domain.cpp
+
+geo.o: ../src/geo.cpp ../include/geo.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o geo.o ../src/geo.cpp
+
+json.o: ../src/json.cpp ../include/json.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o json.o ../src/json.cpp
+
+map_renderer.o: ../src/map_renderer.cpp ../include/map_renderer.h \
+		../include/geo.h \
+		../include/svg.h \
+		../include/transport_catalogue.h \
+		../include/domain.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o map_renderer.o ../src/map_renderer.cpp
+
+request_handler.o: ../src/request_handler.cpp ../include/request_handler.h \
+		../include/transport_catalogue.h \
+		../include/domain.h \
+		../include/geo.h \
+		../include/json.h \
+		../include/map_renderer.h \
+		../include/svg.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o request_handler.o ../src/request_handler.cpp
 
 stat_reader.o: ../src/stat_reader.cpp ../include/stat_reader.h \
-		../include/input_reader.h \
+		../include/request_handler.h \
 		../include/transport_catalogue.h \
-		../include/geo.h
+		../include/domain.h \
+		../include/geo.h \
+		../include/json.h \
+		../include/map_renderer.h \
+		../include/svg.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o stat_reader.o ../src/stat_reader.cpp
+
+svg.o: ../src/svg.cpp ../include/svg.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o svg.o ../src/svg.cpp
 
 tests.o: ../src/tests.cpp ../include/tests.h \
 		../include/log_duration.h \
 		../include/test_framework.h \
-		../include/input_reader.h \
+		../include/stat_reader.h \
+		../include/request_handler.h \
 		../include/transport_catalogue.h \
+		../include/domain.h \
 		../include/geo.h \
-		../include/stat_reader.h
+		../include/json.h \
+		../include/map_renderer.h \
+		../include/svg.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o tests.o ../src/tests.cpp
 
 transport_catalogue.o: ../src/transport_catalogue.cpp ../include/transport_catalogue.h \
+		../include/domain.h \
 		../include/geo.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o transport_catalogue.o ../src/transport_catalogue.cpp
 

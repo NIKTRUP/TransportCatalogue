@@ -8,16 +8,25 @@ LIBS += -ltbb \
 
 SOURCES += \
         main.cpp \
-        src/input_reader.cpp \
+        src/domain.cpp \
+        src/geo.cpp \
+        src/json.cpp \
+        src/map_renderer.cpp \
+        src/request_handler.cpp \
         src/stat_reader.cpp \
+        src/svg.cpp \
         src/tests.cpp \
         src/transport_catalogue.cpp
 
 HEADERS += \
+    include/domain.h \
     include/geo.h \
-    include/input_reader.h \
+    include/json.h \
     include/log_duration.h \
+    include/map_renderer.h \
+    include/request_handler.h \
     include/stat_reader.h \
+    include/svg.h \
     include/test_framework.h \
     include/tests.h \
     include/transport_catalogue.h
