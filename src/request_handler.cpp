@@ -1,6 +1,6 @@
-#include "include/request_handler.h"
+#include "../include/request_handler.h"
 
-namespace tc {
+namespace transport {
 
     namespace detail {
 
@@ -163,7 +163,7 @@ namespace tc {
                              stop_to_distances[name] = std::move(distance_stops);
                         }
                         catalogue.AddStop({std::move(name), std::move(coordinate)});
-                    }else if(query_type == "Bus"s || query_type == "bus"){
+                    }else if(query_type == "Bus"s || query_type == "bus_name"){
                         if(!route_name_stops.count(name)){
                             route_name_stops[std::move(name)] = line.substr(line.find(":"s)+1);
                         }
@@ -225,7 +225,7 @@ namespace tc {
                             HandleStop(map, stop_to_distances, catalogue);
                         }
 
-                        if(type == "Bus"s || type == "bus"s){
+                        if(type == "Bus"s || type == "bus_name"s){
                             routes.push_back(map);
                         }
 
@@ -264,10 +264,15 @@ namespace tc {
                     request.id = static_cast<size_t>(map.at("id").AsInt());
                     if(type == "Stop" || type == "stop" ){
                         init_request(QueryType::Stop, request, map);
-                    }else if(type == "Bus" || type == "bus" ){
-                        init_request(QueryType::Route, request, map);
+                    }else if(type == "Bus" || type == "bus_name" ){
+                        init_request(QueryType::Bus, request, map);
                     }else if(type == "Map" || type == "map"){
                         request.type = QueryType::Map;
+                        requests.push_back(request);
+                    }else if(type == "Route" || type == "route"){
+                        request.type = QueryType::Route;
+                        request.from = map.at("from").AsString();
+                        request.to = map.at("to").AsString();
                         requests.push_back(request);
                     }
                 }
@@ -358,11 +363,19 @@ namespace tc {
                 return settings;
             }
 
-            std::pair<std::vector<StatRequest>, RenderSettings> ParseJson(std::istream& in, TransportCatalogue& catalogue){
+            domain::RoutingSettings HandleRoutingSettings(const json::Dict& map){
+                domain::RoutingSettings routing;
+                routing.bus_wait_time = map.at("bus_wait_time"s).AsInt();
+                routing.bus_velocity = map.at("bus_velocity"s).AsDouble()*KM2MIN;
+                return routing;
+            }
+
+            std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings >> ParseJson(std::istream& in, TransportCatalogue& catalogue){
                 std::vector<StatRequest> out;
                 std::unordered_map<string, string> route_name_stops;
                 std::unordered_map<string, string> stop_to_distances;
                 RenderSettings renderer;
+                std::optional<transport::domain::RoutingSettings> routing;
 
                 json::Document base_stat_requests = json::Load(in);
                 json::Node root = base_stat_requests.GetRoot();
@@ -389,11 +402,18 @@ namespace tc {
                             renderer = HandleRenderSettings(dict_setings);
                         }
                     }
+                    auto it_routing = map_requests.find("routing_settings"s);
+                    if(it_routing != map_requests.end()){
+                        if(it_routing->second.IsDict()){
+                            json::Dict dict_setings = it_routing->second.AsDict();
+                            routing = HandleRoutingSettings(dict_setings);
+                        }
+                    }
 
                 }else{
                     JSON_STRUCTURAL_ERROR;
                 }
-                return {out, renderer};
+                return {out, renderer, routing};
             }
 
             void StrToLower(std::string& s) {
@@ -403,7 +423,7 @@ namespace tc {
             }
 
             // на будущее
-            std::pair<std::vector<StatRequest>, RenderSettings> ReadFile(std::filesystem::path file_path,  TransportCatalogue& catalogue, FileType type){
+            std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings >> ReadFile(std::filesystem::path file_path,  TransportCatalogue& catalogue, FileType type){
                 using namespace std;
 
                 std::ifstream in(file_path);
@@ -426,7 +446,7 @@ namespace tc {
                     throw std::invalid_argument(" Ошибка: Такого файла не существует. Проверьте путь к файлу: "s +  file_path.string());
                 }
                 in.close();
-                return {std::vector<StatRequest>{}, RenderSettings{}};
+                return {std::vector<StatRequest>{}, RenderSettings{}, transport::domain::RoutingSettings{}};
             }
     }
 
@@ -434,7 +454,7 @@ namespace tc {
         detail::ParseTxt(std::cin, catalogue);
     }
 
-    std::pair<std::vector<StatRequest>,const RenderSettings> ReadFile(std::filesystem::path file_path, TransportCatalogue& catalogue){
+    std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<transport::domain::RoutingSettings>> ReadFile(std::filesystem::path file_path, TransportCatalogue& catalogue){
         using namespace std;
         auto extension = file_path.extension().string();
         detail::StrToLower(extension);

@@ -1,8 +1,8 @@
-#include "include/transport_catalogue.h"
+#include "../include/transport_catalogue.h"
 
 using namespace std;
 
-namespace tc {
+namespace transport {
 
     using namespace domain;
 
@@ -44,31 +44,16 @@ namespace tc {
         return result;
     }
 
-    size_t TransportCatalogue::CalculateRouteLength(const Route* route) const {
-        size_t result = 0;
-        if (route != nullptr) {
-            for (auto first = route->stops.begin(), second = first+1; second < route->stops.end(); ++first, ++second) {
-                result += GetStopsDistances({*first, *second});
-            }
-            if (route->route_type == RouteType::LINEAR) {
-                for (auto first = route->stops.rbegin(), second = first+1; second < route->stops.rend(); ++first, ++second) {
-                    result += GetStopsDistances((*first)->name, (*second)->name);
-                }
-            }
-        }
-        return result;
-    }
-
     void TransportCatalogue::AddStop(Stop stop) noexcept{
         stops_.push_back(std::move(stop));
-        stops_by_names_.insert({stops_.back().name, &stops_.back()});
+        stops_by_name_.insert({stops_.back().name, &stops_.back()});
     }
 
     const Stop* TransportCatalogue::FindStop(std::string_view name) const{
-        if (stops_by_names_.count(name) == 0) {
+        if (stops_by_name_.count(name) == 0) {
             throw std::out_of_range(" Остановка "s + std::string(name) + " не найдена в каталоге "s);
         }
-        return stops_by_names_.at(name);
+        return stops_by_name_.at(name);
     }
 
     const Stop* TransportCatalogue::FindStop(const std::string& name) const{
@@ -82,24 +67,24 @@ namespace tc {
         routes_by_names_.insert({route_name, &routes_.back()});
         // добавляем информацию об автобусе в остановки по маршруту
         for (auto stop : routes_.back().stops) {
-            buses_on_stops_[stop->name].insert(route_name);
+            buses_on_stop_[stop->name].insert(route_name);
         }
     }
 
-    const domain::Route*  TransportCatalogue::FindRoute(std::string_view name) const{
+    const domain::Route*  TransportCatalogue::FindBus(std::string_view name) const{
         if(routes_by_names_.count(name) == 0){
             throw std::out_of_range(" Маршрут "s + std::string(name) + " не найден в каталоге "s);
         }
         return routes_by_names_.at(name);
     }
 
-    const Route* TransportCatalogue::FindRoute(const std::string& name) const{
-        return FindRoute(std::string_view(name));
+    const Route* TransportCatalogue::FindBus(const std::string& name) const{
+        return FindBus(std::string_view(name));
     }
 
     RouteInfo TransportCatalogue::GetRouteInfo(const std::string& name) const {
         domain::RouteInfo result;
-        auto route = FindRoute(name);
+        auto route = FindBus(name);
         result.name = route->name;
         result.route_type = route->route_type;
         result.stop_count = CountStops(route);
@@ -112,9 +97,9 @@ namespace tc {
 
     std::optional<std::set<std::string_view>> TransportCatalogue::GetBusesOnStop(const std::string& name) const{
         std::optional<std::set<std::string_view>> stop_busses;
-        if(stops_by_names_.count(name)){ // если найден в базе
-            if(buses_on_stops_.count(name)){ // и есть автобусы
-                stop_busses = buses_on_stops_.at(name);
+        if(stops_by_name_.count(name)){ // если найден в базе
+            if(buses_on_stop_.count(name)){ // и есть автобусы
+                stop_busses = buses_on_stop_.at(name);
             }else{ // и нет автобусов
                 stop_busses = std::set<std::string_view>{};
             }
@@ -134,12 +119,28 @@ namespace tc {
         SetDistance({begin, end}, distance);
     }
 
-    const std::deque<domain::Stop> TransportCatalogue::GetStops() const{
+    const std::deque<domain::Stop>& TransportCatalogue::GetStops() const{
         return stops_;
     }
 
-    const std::deque<domain::Route> TransportCatalogue::GetRoutes() const{
+    const std::deque<domain::Route>& TransportCatalogue::GetRoutes() const{
         return routes_;
+    }
+
+    const TransportCatalogue::UnMapStopsToDistance& TransportCatalogue::GetDistancesStops() const{
+        return distance_stops;
+    }
+
+    const TransportCatalogue::UnMapStopToBuses& TransportCatalogue::GetBusesOnStop() const{
+        return buses_on_stop_;
+    }
+
+    const TransportCatalogue::UnMapNameToRoute& TransportCatalogue::GetRoutesByNames() const{
+        return routes_by_names_;
+    }
+
+    const TransportCatalogue::UnMapNameToStop& TransportCatalogue::GetStopsByNames() const{
+        return stops_by_name_;
     }
 
     size_t TransportCatalogue::GetAmountStops() const{
@@ -154,24 +155,56 @@ namespace tc {
         return distance_stops.size();
     }
 
-    size_t TransportCatalogue::GetStopsDistances(const std::pair<std::string, std::string>& pair) const{
-        return GetStopsDistances(FindStop(pair.first), FindStop(pair.second));
+    size_t TransportCatalogue::AtStopsDistance(const std::pair<std::string, std::string>& pair) const{
+        return AtStopsDistance(FindStop(pair.first), FindStop(pair.second));
     }
 
-    size_t TransportCatalogue::GetStopsDistances(std::pair<const Stop*, const Stop*> stops) const{
+    size_t TransportCatalogue::AtStopsDistance(std::pair<const Stop*, const Stop*> stops) const{
         if(distance_stops.count(stops) == 0 ){
             throw std::out_of_range(" Расстояние между остановками неизвестно ");
         }
         return distance_stops.at(stops);
     }
 
-    size_t TransportCatalogue::GetStopsDistances(const Stop* begin, const Stop* end) const{
-        std::pair<const Stop*, const Stop*> stops = {begin, end};
-        return GetStopsDistances(stops);
+    size_t TransportCatalogue::AtStopsDistance(const Stop* begin, const Stop* end) const{
+        return AtStopsDistance({begin, end});
     }
 
-    size_t TransportCatalogue::GetStopsDistances(const std::string& begin, const std::string& end) const{
-        return GetStopsDistances(FindStop(begin), FindStop(end));
+    size_t TransportCatalogue::AtStopsDistance(const std::string& begin, const std::string& end) const{
+        return AtStopsDistance({begin, end});
     }
 
+    std::optional<size_t> TransportCatalogue::GetStopsDistance(const std::pair<std::string, std::string>& pair) const{
+        return GetStopsDistance(FindStop(pair.first), FindStop(pair.second));
+    }
+
+    std::optional<size_t> TransportCatalogue::GetStopsDistance(std::pair<const domain::Stop*, const domain::Stop*> stops) const{
+        if(distance_stops.count(stops) == 0 ){
+            return std::nullopt;
+        }
+        return distance_stops.at(stops);
+    }
+
+    std::optional<size_t> TransportCatalogue::GetStopsDistance(const domain::Stop* begin, const domain::Stop* end) const{
+        return GetStopsDistance({begin, end});
+    }
+
+    std::optional<size_t> TransportCatalogue::GetStopsDistance(const std::string& begin, const std::string& end) const{
+        return GetStopsDistance({begin, end});
+    }
+
+    size_t TransportCatalogue::CalculateRouteLength(const Route* route) const {
+        size_t result = 0;
+        if (route != nullptr) {
+            for (auto first = route->stops.begin(), second = first+1; second < route->stops.end(); ++first, ++second) {
+                result += AtStopsDistance({*first, *second});
+            }
+            if (route->route_type == RouteType::LINEAR) {
+                for (auto first = route->stops.rbegin(), second = first+1; second < route->stops.rend(); ++first, ++second) {
+                    result += AtStopsDistance((*first)->name, (*second)->name);
+                }
+            }
+        }
+        return result;
+    }
 }

@@ -1,6 +1,6 @@
-#include "include/stat_reader.h"
+#include "../include/stat_reader.h"
 
-namespace tc {
+namespace transport {
 
     using namespace detail;
 
@@ -45,7 +45,7 @@ namespace tc {
 
         void PrintQuery(const QueryType& type, const std::string& name, const TransportCatalogue& catalogue, std::ostream& out){
             switch (type) {
-            case QueryType::Route:
+            case QueryType::Bus:
                 GetRoute(name, catalogue, out);
                 break;
             case QueryType::Stop:
@@ -73,8 +73,8 @@ namespace tc {
 
                  QueryType type_mode;
 
-                 if(str_type == "Bus"s || str_type == "bus"s){
-                     type_mode = QueryType::Route;
+                 if(str_type == "Bus"s || str_type == "bus_name"s){
+                     type_mode = QueryType::Bus;
                  } else if(str_type == "Stop"s || str_type == "stop"s){
                      type_mode = QueryType::Stop;
                  }else{
@@ -153,7 +153,7 @@ namespace tc {
             return builder.Build();
         }
 
-        json::Node GetRoute(size_t id, const std::string& name, const TransportCatalogue& catalogue){
+        json::Node GetBus(size_t id, const std::string& name, const TransportCatalogue& catalogue){
             using namespace std::literals;
             domain::RouteInfo info;
             bool check = false;
@@ -192,17 +192,83 @@ namespace tc {
                     .Build();
         }
 
-        void PrintQuery(const std::vector<StatRequest> requests, const TransportCatalogue& catalogue, const DictRenderer& renderer, std::ostream& out){
+        json::Node GetRoute(size_t id, const std::string& from,
+                            const std::string& to, const TransportCatalogue& catalogue, const TransportRouter* router){
+            using namespace std::literals;
+            json::Builder builder;
+            auto route = router->FindRoute(from, to);
+            if(route.has_value()){
+                double total_time = 0;
+                int wait_time = router->GetSettings().bus_wait_time;
+                json::Array items;
+                for (const auto &edge : route.value()) {
+                    total_time += edge.time;
+                    json::Dict wait_elem = json::Builder{}.StartDict().
+                            Key("type"s).Value("Wait"s).
+                            Key("stop_name"s).Value(std::string(edge.stop_name)).
+                            Key("time"s).Value(wait_time).
+                            EndDict().Build().AsDict();
+                    json::Dict ride_elem = json::Builder{}.StartDict().
+                            Key("type"s).Value("Bus"s).
+                            Key("bus"s).Value(std::string(edge.bus_name)).
+                            Key("span_count"s).Value(static_cast<int>(edge.span_count)).
+                            Key("time"s).Value(edge.time - wait_time).
+                            EndDict().Build().AsDict();
+                    items.push_back(wait_elem);
+                    items.push_back(ride_elem);
+                }
+                return json::Builder{}.StartDict().
+                        Key("request_id"s).Value(static_cast<int>(id)).
+                        Key("total_time"s).Value(total_time).
+                        Key("items"s).Value(items).
+                        EndDict().Build();
+            }
+
+            return GetNotFound(static_cast<int>(id));
+        }
+
+//    builder.StartDict()
+//    .Key("request_id"s).Value(static_cast<int>(id))
+//    .Key("time"s).Value(route->total_time)
+//    .Key("items"s).StartArray();
+//    for(size_t i = 0 ; i < route->activities.size(); ++i){
+//    if(route->activities[i].type == ActivityType::Wait){
+//    builder.StartDict()
+//    .Key("type"s).Value("Wait"s)
+//    .Key("stop_name"s).Value(route->activities[i].stop_name)
+//    .Key("time"s).Value(route->activities[i].time)
+//    .EndDict();
+//}else if(route->activities[i].type == ActivityType::Bus){
+//builder.StartDict()
+//.Key("type"s).Value("Bus"s)
+//.Key("bus_name"s).Value(route->activities[i].bus_name)
+//.Key("span_count").Value(static_cast<int>(route->activities[i].span_count))
+//.Key("time"s).Value(route->activities[i].time)
+//.EndDict();
+//}
+//}
+//builder.EndArray()
+//.EndDict();
+//return builder.Build();
+
+        void PrintQuery(const std::vector<StatRequest> requests, const TransportCatalogue& catalogue,
+                        const DictRenderer& renderer, std::ostream& out, const TransportRouter* router){
             using namespace std::literals;
 
-            auto get_response = [&catalogue, &renderer](const StatRequest& request){
+            auto get_response = [&catalogue, &renderer, &router](const StatRequest& request){
                 if(request.type == QueryType::Stop){
                     return GetStop(request.id, request.name, catalogue);
-                }else if(request.type == QueryType::Route){
-                    return GetRoute(request.id, request.name, catalogue);
+                }else if(request.type == QueryType::Bus){
+                    return GetBus(request.id, request.name, catalogue);
                 }else if(request.type == QueryType::Map){
                     if(renderer.GetSettings().is_init == true){
                         return GetDict(request.id, renderer);
+                    }
+                }else if(request.type == QueryType::Route){
+                    if(router != nullptr){
+                        return GetRoute(request.id, request.from, request.to, catalogue, router);
+                    }else{
+                        throw std::logic_error("Нет настроек ожидания на остановке и скорости автобусов");
                     }
                 }
                 return json::Node{};

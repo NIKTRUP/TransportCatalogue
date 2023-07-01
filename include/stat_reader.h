@@ -5,10 +5,11 @@
 #include <vector>
 #include <filesystem>
 #include <fstream>
-#include "include/request_handler.h"
-#include "json/json_builder.h"
+#include "../include/request_handler.h"
+#include "../json/json_builder.h"
+#include "../include/transport_router.h"
 
-namespace tc {
+namespace transport {
 
     void GetRoute(const std::string& name, const TransportCatalogue& catalogue, std::ostream& out);
 
@@ -22,15 +23,17 @@ namespace tc {
 
     json::Node GetNotFound(size_t id);
 
-    void GetNotFound(size_t id, std::ostream& out);
-
     json::Node GetStop(size_t id, const std::string& name, const TransportCatalogue& catalogue);
 
-    json::Node GetRoute(size_t id, const std::string& name,const TransportCatalogue& catalogue);
+    json::Node GetBus(size_t id, const std::string& name, const TransportCatalogue& catalogue);
 
-    json::Node GetMap(size_t id, const DictRenderer& renderer);
+    json::Node GetDict(size_t id, const DictRenderer& renderer);
 
-    void PrintQuery(const std::vector<StatRequest> requests,const TransportCatalogue& catalogue, const DictRenderer& renderer ,std::ostream& out = std::cout);
+    json::Node GetRoute(size_t id, const std::string& from,
+                        const std::string& to, const TransportCatalogue& catalogue, const TransportRouter* router );
+
+    void PrintQuery(const std::vector<StatRequest> requests, const TransportCatalogue& catalogue,
+                    const DictRenderer& renderer, std::ostream& out = std::cout, const TransportRouter* router = nullptr);
 }
 
 #endif // STAT_READER_H

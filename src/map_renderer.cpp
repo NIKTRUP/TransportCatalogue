@@ -1,6 +1,6 @@
-#include "include/map_renderer.h"
+#include "../include/map_renderer.h"
 
-namespace tc {
+namespace transport {
 
 using namespace std::literals;
 
@@ -16,7 +16,7 @@ DictRenderer::DictRenderer(const TransportCatalogue& catalogue, const RenderSett
         }
 
         for (const auto& name : route_names_) {
-            const auto& route = catalogue_.FindRoute(std::string(name))->stops;
+            const auto& route = catalogue_.FindBus(std::string(name))->stops;
             for (const auto& stop : route) {
                 stop_names_.insert(stop->name);
                 geo_coords.push_back(stop->coordinate);
@@ -38,7 +38,7 @@ DictRenderer::DictRenderer(const TransportCatalogue& catalogue, const RenderSett
    void DictRenderer::AddLines(const SphereProjector& projector) {
            size_t color = 0;
            for (const auto& name : route_names_) {
-               auto route = catalogue_.FindRoute(std::string(name));
+               auto route = catalogue_.FindBus(std::string(name));
                if (!route->stops.empty()) {
                    svg::Polyline line;
                    line.SetStrokeColor(settings_.color_palette.at(color)).
@@ -65,7 +65,7 @@ DictRenderer::DictRenderer(const TransportCatalogue& catalogue, const RenderSett
    void DictRenderer::AddRouteNames(const SphereProjector& projector) {
        size_t color = 0;
        for (const auto& route_name : route_names_) {
-           auto route = catalogue_.FindRoute(route_name);
+           auto route = catalogue_.FindBus(route_name);
            if (!route->stops.empty()) {
                svg::Text name, underlayer_text;
                name.SetData(std::string(route->name)).

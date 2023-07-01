@@ -2,10 +2,10 @@
 #define TESTS_H
 
 #include "filesystem"
-#include "include/log_duration.h"
-#include "include/test_framework.h"
+#include "../include/log_duration.h"
+#include "../include/test_framework.h"
 
-namespace tc {
+namespace transport {
 
     namespace tests {
 
@@ -41,7 +41,17 @@ namespace tc {
 
         void TestSvgFiles(std::filesystem::path test_path, std::filesystem::path standard_path, std::ostream& out_logs);
 
+        std::vector<double> LoadRouteTime(std::istream& in);
+
+        std::vector<double> LoadRouteTime(std::filesystem::path test_path);
+
+        void CheckFindingOptimalRoute(std::filesystem::path test_in, std::filesystem::path standard_out, std::filesystem::path out_log);
+
+        void TestFindingOptimalRoute();
+
         void TestProject();
+
+        void TestExamples();
     }
 }
 

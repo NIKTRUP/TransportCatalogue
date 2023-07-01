@@ -10,9 +10,10 @@
 #include <iostream>
 #include <unordered_map>
 #include <optional>
-#include "include/domain.h"
+#include "../include/domain.h"
+#include "../include/graph.h"
 
-namespace tc {
+namespace transport {
 
     size_t CountStops(const domain::Route *route) noexcept;
 
@@ -23,6 +24,11 @@ namespace tc {
     // Транспортный справочник
     class TransportCatalogue{
 
+        using UnMapStopToBuses = std::unordered_map<std::string_view, std::set<std::string_view>>;
+        using UnMapNameToRoute = std::unordered_map<std::string_view, const domain::Route*>;
+        using UnMapNameToStop  = std::unordered_map<std::string_view, const domain::Stop*>;
+        using UnMapStopsToDistance = std::unordered_map<std::pair<const domain::Stop*, const domain::Stop*>, size_t, domain::StopsHasher>;
+
     public:
 
        void AddStop(domain::Stop stop) noexcept;
@@ -32,8 +38,8 @@ namespace tc {
 
        void AddRoute(domain::Route route) noexcept;
 
-       const domain::Route*  FindRoute(std::string_view name) const;
-       const domain::Route*  FindRoute(const std::string& name) const;
+       const domain::Route*  FindBus(std::string_view name) const;
+       const domain::Route*  FindBus(const std::string& name) const;
 
        domain::RouteInfo GetRouteInfo(const std::string& name) const ;
 
@@ -42,9 +48,17 @@ namespace tc {
        void SetDistance(std::pair<const domain::Stop*,const domain::Stop*> pair_stops, size_t distance);
        void SetDistance(const domain::Stop* begin, const domain::Stop* end, size_t distance);
 
-       const std::deque<domain::Stop> GetStops() const;
+       const std::deque<domain::Stop>& GetStops() const;
 
-       const std::deque<domain::Route> GetRoutes() const;
+       const std::deque<domain::Route>& GetRoutes() const;
+
+       const UnMapStopsToDistance& GetDistancesStops() const;
+
+       const UnMapStopToBuses& GetBusesOnStop() const;
+
+       const UnMapNameToRoute& GetRoutesByNames() const;
+
+       const UnMapNameToStop& GetStopsByNames() const;
 
        size_t GetAmountStops() const;
 
@@ -52,10 +66,15 @@ namespace tc {
 
        size_t GetAmountStopsDistances() const;
 
-       size_t GetStopsDistances(const std::pair<std::string, std::string>& pair) const;
-       size_t GetStopsDistances(std::pair<const domain::Stop*, const domain::Stop*>) const;
-       size_t GetStopsDistances(const domain::Stop*, const domain::Stop*) const;
-       size_t GetStopsDistances(const std::string& begin, const std::string& end) const;
+       size_t AtStopsDistance(const std::pair<std::string, std::string>& pair) const;
+       size_t AtStopsDistance(std::pair<const domain::Stop*, const domain::Stop*> stops) const;
+       size_t AtStopsDistance(const domain::Stop* begin, const domain::Stop* end) const;
+       size_t AtStopsDistance(const std::string& begin, const std::string& end) const;
+
+       std::optional<size_t> GetStopsDistance(const std::pair<std::string, std::string>& pair) const;
+       std::optional<size_t> GetStopsDistance(std::pair<const domain::Stop*, const domain::Stop*> stops) const;
+       std::optional<size_t> GetStopsDistance(const domain::Stop* begin, const domain::Stop* end) const;
+       std::optional<size_t> GetStopsDistance(const std::string& begin, const std::string& end) const;
 
        size_t CalculateRouteLength(const domain::Route* route) const;
 
@@ -63,16 +82,15 @@ namespace tc {
        // остановки
        std::deque<domain::Stop> stops_;
        // Формат хранения: имя_остановки - указатель_на_остановку
-       std::unordered_map<std::string_view, const domain::Stop*> stops_by_names_;
+       UnMapNameToStop stops_by_name_;
        // автобусы на каждой остановке. // Формат хранения: имя_остановки - множество_автобусов
-       std::unordered_map<std::string_view, std::set<std::string_view>> buses_on_stops_;
+       UnMapStopToBuses buses_on_stop_;
        // маршруты
        std::deque<domain::Route> routes_;
        // Формат хранения для поиска: имя_маршрута(совпадает с именем автобуса) - указатель на маршрут
-       std::unordered_map<std::string_view, const domain::Route*> routes_by_names_;
-
-       // расчёт расстояний между остановками .
-       std::unordered_map<std::pair<const domain::Stop*, const domain::Stop*>, size_t, domain::StopsHasher> distance_stops;
+       UnMapNameToRoute routes_by_names_;
+       // расчёт расстояний между остановками (в метрах).
+       UnMapStopsToDistance distance_stops;
     };
 
 }

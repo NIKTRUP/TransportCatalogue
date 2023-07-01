@@ -2,16 +2,16 @@
 #define MAP_RENDERER_H
 
 #include "geo.h"
-#include "svg/svg.h"
+#include "../svg/svg.h"
 
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
 #include <optional>
 #include <vector>
-#include "include/transport_catalogue.h"
+#include "../include/transport_catalogue.h"
 
-namespace tc {
+namespace transport {
 
     inline const double EPSILON = 1e-6;
     inline bool IsZero(double value) {

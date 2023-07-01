@@ -1,10 +1,10 @@
-#include "include/tests.h"
-#include "include/stat_reader.h"
-#include "json/json.h"
-#include "json/json_builder.h"
+#include "../include/tests.h"
+#include "../include/stat_reader.h"
+#include "../json/json.h"
+#include "../json/json_builder.h"
 using namespace std;
 
-namespace tc {
+namespace transport {
 
     namespace tests {
 
@@ -307,10 +307,10 @@ namespace tc {
             ASSERT_EQUAL(res[2].second, "751"s);
             ASSERT_EQUAL(res[3].second, "751 - 26"s);
 
-            ASSERT(res[0].first == QueryType::Route);
-            ASSERT(res[1].first == QueryType::Route);
-            ASSERT(res[2].first == QueryType::Route);
-            ASSERT(res[3].first == QueryType::Route);
+            ASSERT(res[0].first == QueryType::Bus);
+            ASSERT(res[1].first == QueryType::Bus);
+            ASSERT(res[2].first == QueryType::Bus);
+            ASSERT(res[3].first == QueryType::Bus);
             }
 
             {
@@ -364,17 +364,17 @@ namespace tc {
                 std::string distanses =  "7500m to Rossoshanskaya ulitsa, 1800m to Biryusinka, 2400m to Universam"s;
                 ParseDistances(catalogue, stop_to_distances);
 
-                ASSERT_EQUAL(catalogue.GetStopsDistances("Biryulyovo Zapadnoye"s, "Rossoshanskaya ulitsa"s), 7500);
-                ASSERT_EQUAL(catalogue.GetStopsDistances("Rossoshanskaya ulitsa"s, "Biryulyovo Zapadnoye"s), 2500);
+                ASSERT_EQUAL(catalogue.AtStopsDistance("Biryulyovo Zapadnoye"s, "Rossoshanskaya ulitsa"s), 7500);
+                ASSERT_EQUAL(catalogue.AtStopsDistance("Rossoshanskaya ulitsa"s, "Biryulyovo Zapadnoye"s), 2500);
 
-                ASSERT_EQUAL(catalogue.GetStopsDistances("Biryulyovo Zapadnoye"s, "Biryusinka"s), 1800);
-                ASSERT_EQUAL(catalogue.GetStopsDistances("Biryusinka"s, "Biryulyovo Zapadnoye"s), 1800);
+                ASSERT_EQUAL(catalogue.AtStopsDistance("Biryulyovo Zapadnoye"s, "Biryusinka"s), 1800);
+                ASSERT_EQUAL(catalogue.AtStopsDistance("Biryusinka"s, "Biryulyovo Zapadnoye"s), 1800);
 
-                ASSERT_EQUAL(catalogue.GetStopsDistances("Biryusinka"s, "Universam"s), 750);
-                ASSERT_EQUAL(catalogue.GetStopsDistances("Universam"s, "Biryusinka"s), 250);
+                ASSERT_EQUAL(catalogue.AtStopsDistance("Biryusinka"s, "Universam"s), 750);
+                ASSERT_EQUAL(catalogue.AtStopsDistance("Universam"s, "Biryusinka"s), 250);
 
-                ASSERT_EQUAL(catalogue.GetStopsDistances("Biryulyovo Zapadnoye"s, "Universam"s), 2400);
-                ASSERT_EQUAL(catalogue.GetStopsDistances("Universam"s, "Biryulyovo Zapadnoye"s), 2400);
+                ASSERT_EQUAL(catalogue.AtStopsDistance("Biryulyovo Zapadnoye"s, "Universam"s), 2400);
+                ASSERT_EQUAL(catalogue.AtStopsDistance("Universam"s, "Biryulyovo Zapadnoye"s), 2400);
 
             }
 
@@ -619,7 +619,7 @@ namespace tc {
                 const auto doc = json::Load(strm);
                 ASSERT(doc.GetRoot() == arr);
                 const auto duration = std::chrono::steady_clock::now() - start;
-                std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() << "ms"sv
+                std::cerr << "Benchmark: " << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() << "ms"sv
                           << std::endl;
             }
 
@@ -877,23 +877,23 @@ namespace tc {
 
             catalogue.SetDistance(catalogue.FindStop(stop1), catalogue.FindStop(stop2), 350);
             ASSERT_EQUAL(catalogue.GetAmountStopsDistances(), 2);
-            ASSERT(catalogue.GetStopsDistances(stop1, stop2) == 350);
-            ASSERT(catalogue.GetStopsDistances(stop2, stop1) == 350);
+            ASSERT(catalogue.AtStopsDistance(stop1, stop2) == 350);
+            ASSERT(catalogue.AtStopsDistance(stop2, stop1) == 350);
 
             catalogue.SetDistance(catalogue.FindStop(stop2), catalogue.FindStop(stop1), 650);
             ASSERT_EQUAL(catalogue.GetAmountStopsDistances(), 2);
-            ASSERT(catalogue.GetStopsDistances(stop1, stop2) == 350);
-            ASSERT(catalogue.GetStopsDistances(stop2, stop1) == 650);
+            ASSERT(catalogue.AtStopsDistance(stop1, stop2) == 350);
+            ASSERT(catalogue.AtStopsDistance(stop2, stop1) == 650);
 
             catalogue.SetDistance(catalogue.FindStop(stop2), catalogue.FindStop(stop3), 550);
             ASSERT_EQUAL(catalogue.GetAmountStopsDistances(), 4);
-            ASSERT(catalogue.GetStopsDistances(stop2, stop3) == 550);
-            ASSERT(catalogue.GetStopsDistances(stop3, stop2) == 550);
+            ASSERT(catalogue.AtStopsDistance(stop2, stop3) == 550);
+            ASSERT(catalogue.AtStopsDistance(stop3, stop2) == 550);
 
             catalogue.SetDistance(catalogue.FindStop(stop3), catalogue.FindStop(stop1), 750);
             ASSERT_EQUAL(catalogue.GetAmountStopsDistances(), 6);
-            ASSERT(catalogue.GetStopsDistances(stop3, stop1) == 750);
-            ASSERT(catalogue.GetStopsDistances(stop1, stop3) == 750);
+            ASSERT(catalogue.AtStopsDistance(stop3, stop1) == 750);
+            ASSERT(catalogue.AtStopsDistance(stop1, stop3) == 750);
             }
 
             {
@@ -909,23 +909,23 @@ namespace tc {
             catalogue.SetDistance(catalogue.FindStop(stop1), catalogue.FindStop(stop2), 350);
             catalogue.SetDistance(catalogue.FindStop(stop1), catalogue.FindStop(stop3), 990);
             ASSERT_EQUAL(catalogue.GetAmountStopsDistances(), 4);
-            ASSERT_EQUAL(catalogue.GetStopsDistances(stop1, stop2), 350);
-            ASSERT_EQUAL(catalogue.GetStopsDistances(stop2, stop1), 350);
-            ASSERT_EQUAL(catalogue.GetStopsDistances(stop1, stop3), 990);
-            ASSERT_EQUAL(catalogue.GetStopsDistances(stop3, stop1), 990);
+            ASSERT_EQUAL(catalogue.AtStopsDistance(stop1, stop2), 350);
+            ASSERT_EQUAL(catalogue.AtStopsDistance(stop2, stop1), 350);
+            ASSERT_EQUAL(catalogue.AtStopsDistance(stop1, stop3), 990);
+            ASSERT_EQUAL(catalogue.AtStopsDistance(stop3, stop1), 990);
 
             catalogue.SetDistance(catalogue.FindStop(stop2), catalogue.FindStop(stop3), 550);
             catalogue.SetDistance(catalogue.FindStop(stop2), catalogue.FindStop(stop1), 650);
             ASSERT_EQUAL(catalogue.GetAmountStopsDistances(), 6);
-            ASSERT_EQUAL(catalogue.GetStopsDistances(stop2, stop3), 550);
-            ASSERT_EQUAL(catalogue.GetStopsDistances(stop3, stop2), 550);
-            ASSERT_EQUAL(catalogue.GetStopsDistances(stop1, stop2), 350);
-            ASSERT_EQUAL(catalogue.GetStopsDistances(stop2, stop1), 650);
+            ASSERT_EQUAL(catalogue.AtStopsDistance(stop2, stop3), 550);
+            ASSERT_EQUAL(catalogue.AtStopsDistance(stop3, stop2), 550);
+            ASSERT_EQUAL(catalogue.AtStopsDistance(stop1, stop2), 350);
+            ASSERT_EQUAL(catalogue.AtStopsDistance(stop2, stop1), 650);
 
             catalogue.SetDistance(catalogue.FindStop(stop3), catalogue.FindStop(stop1), 750);
             ASSERT_EQUAL(catalogue.GetAmountStopsDistances(), 6);
-            ASSERT_EQUAL(catalogue.GetStopsDistances(stop3, stop1), 750);
-            ASSERT_EQUAL(catalogue.GetStopsDistances(stop1, stop3), 990);
+            ASSERT_EQUAL(catalogue.AtStopsDistance(stop3, stop1), 750);
+            ASSERT_EQUAL(catalogue.AtStopsDistance(stop1, stop3), 990);
             }
 
         }
@@ -972,11 +972,11 @@ namespace tc {
                     append(test_path.stem().string()).string().
                     append("_my_result.log"s);
 
-            auto [out, settings] = ReadFile(test_path, catalogue); // TODO::
-            DictRenderer renderer(catalogue, settings);
+            auto [out, render_settings, routing_settings] = ReadFile(test_path, catalogue);
+            DictRenderer render(catalogue, render_settings);
             std::ofstream out_stream(result_path.string());
             if(out_stream.is_open()){
-                PrintQuery(out , catalogue, renderer, out_stream);
+                PrintQuery(out , catalogue, render, out_stream);
             }else{
                 std::cerr << "Ошибка: файл для вывода результатов " << result_path.string() << " не открыт " << std::endl;
             }
@@ -994,11 +994,11 @@ namespace tc {
                     append("_my_result.log"s);
 
 
-            auto [out, settings] = ReadFile(test_path, catalogue); // TODO::
-            DictRenderer renderer(catalogue, settings);
+            auto [out, render_settings, routing_settings] = ReadFile(test_path, catalogue);
+            DictRenderer render(catalogue, render_settings);
             std::ofstream out_stream(result_path.string());
             if(out_stream.is_open()){
-                renderer.Print(out_stream);
+                render.Print(out_stream);
             }else{
                 std::cerr << "Ошибка: файл для вывода результатов " << result_path.string() << " не открыт " << std::endl;
             }
@@ -1006,6 +1006,110 @@ namespace tc {
 
             EqualLogFiles(result_path, standard_path, out_logs);
 
+        }
+
+        std::vector<double> LoadRouteTime(std::istream& in){
+            std::vector<double> route_times;
+            json::Document base_stat_requests = json::Load(in);
+            json::Node root = base_stat_requests.GetRoot();
+            if(root.IsArray()){
+                json::Array requests = root.AsArray();
+                for (auto item : requests) {
+                    auto map = item.AsDict();
+                    auto it_time = map.find("total_time");
+                    if(it_time != map.end()){
+                        route_times.push_back(it_time->second.AsDouble());
+                    }
+                }
+            }else{
+                JSON_STRUCTURAL_ERROR;
+            }
+            return route_times;
+        }
+
+        std::vector<double> LoadRouteTime(std::filesystem::path test_path){
+            std::ifstream in(test_path);
+            if(!in.is_open()){
+                throw std::invalid_argument(" Ошибка: Такого файла не существует. Проверьте путь к файлу: "s +  test_path.string());
+            }
+
+            std::vector<double> route_times = LoadRouteTime(in);
+            in.close();
+            return route_times;
+        }
+
+        void CheckFindingOptimalRoute(path test_in, path standard_out, path out_log){
+            double eps = 1e-16;
+            TransportCatalogue catalogue;
+            auto [requests, render_settings, routing_settings] = ReadFile(test_in, catalogue);
+            DictRenderer render(catalogue, render_settings);
+            std::stringstream ss;
+            if(routing_settings.has_value()){
+                TransportRouter router(catalogue, routing_settings.value());
+                PrintQuery(requests, catalogue, render, ss, &router);
+            }else{
+                std::cerr << "параметр routing_settings не был обнаружен в файле " + test_in.string() << std::endl;
+            }
+
+            std::ofstream out(out_log);
+            out << ss.str();
+            out.close();
+
+            auto route_times = LoadRouteTime(ss);
+            auto test_route_time = LoadRouteTime(standard_out);
+            bool check = true;
+            for (size_t i = 0; i <  route_times.size(); ++i) {
+                if(std::abs(route_times[i] - test_route_time[i]) >= eps){
+                    std::cerr << " В " << i << " запросе на оптимальный маршрут есть различия в файлах " <<
+                    out_log.string() << " и " << standard_out.string() << "."
+                    << " Мой результат = " << route_times[i]
+                    << ", В тестах = " << test_route_time[i] << std::endl;
+                    check = false;
+                }
+            }
+            ASSERT(check);
+        }
+
+        void TestFindingOptimalRoute(){
+            CheckFindingOptimalRoute("../tests/tsD_case/tsD_case_input.json"s,
+                                     "../tests/tsD_case/tsD_case_output.json"s,
+                                     "../tests/tsD_case/tsD_case_my_result.json"s);
+
+            CheckFindingOptimalRoute("../tests/tsE_case/tsE_case_input.json"s,
+                                     "../tests/tsE_case/tsE_case_output.json"s,
+                                     "../tests/tsE_case/tsE_case_my_result.json"s);
+
+            CheckFindingOptimalRoute("../tests/tsF_case/tsF_case_input.json"s,
+                                     "../tests/tsF_case/tsF_case_output.json"s,
+                                     "../tests/tsF_case/tsF_case_my_result.json"s);
+
+//            CheckFindingOptimalRoute("../tests/tsG_case/tsG_case_input.json"s,
+//                                     "../tests/tsG_case/tsG_case_output.json"s,
+//                                     "../tests/tsG_case/tsG_case_my_result.json"s);
+
+            CheckFindingOptimalRoute("../tests/tsH_case/tsH_case_input.json"s,
+                                     "../tests/tsH_case/tsH_case_output.json"s,
+                                     "../tests/tsH_case/tsH_case_my_result.json"s);
+
+            CheckFindingOptimalRoute("../tests/tsI_case/tsI_case_input.json"s,
+                                     "../tests/tsI_case/tsI_case_output.json"s,
+                                     "../tests/tsI_case/tsI_case_my_result.json"s);
+
+            CheckFindingOptimalRoute("../tests/tsJ_case/tsJ_case_input.json"s,
+                                     "../tests/tsJ_case/tsJ_case_output.json"s,
+                                     "../tests/tsJ_case/tsJ_case_my_result.json"s);
+
+            CheckFindingOptimalRoute("../tests/tsK_case/tsK_case_input.json"s,
+                                     "../tests/tsK_case/tsK_case_output.json"s,
+                                     "../tests/tsK_case/tsK_case_my_result.json"s);
+
+            CheckFindingOptimalRoute("../tests/tsL_case/tsL_case_input.json"s,
+                                     "../tests/tsL_case/tsL_case_output.json"s,
+                                     "../tests/tsL_case/tsL_case_my_result.json"s);
+
+            CheckFindingOptimalRoute("../tests/tsM_case/tsM_case_input.json"s,
+                                     "../tests/tsM_case/tsM_case_output.json"s,
+                                     "../tests/tsM_case/tsM_case_my_result.json"s);
         }
 
         void TestProject(){
@@ -1024,6 +1128,59 @@ namespace tc {
             RUN_TEST(test, TestParseRouteQuery);
             RUN_TEST(test, TestParseOutputQuery);
             RUN_TEST(test, TestParseDistances);
+            RUN_TEST(test, TestFindingOptimalRoute);
         }
+
+        void TestExamples(){
+            std::string out_path = "../test_difference.log";
+            std::filesystem::remove(out_path);
+            std::ofstream out_logs(out_path, std::ios::app);
+            {
+                if(out_logs.is_open()){
+
+                    TestRunner test;
+                    auto tsC_case1 = [&](){ tests::TestTxtFiles("../tests/tsC_case/tsC_case1_input.txt"s, "../tests/tsC_case/tsC_case1_output1.txt"s, out_logs); };
+                    RUN_TEST(test, tsC_case1);
+
+                }else{
+                    std::cerr << "Ошибка: Log файл " << out_path << " не открыт " << std::endl;
+                }
+            }
+
+            {
+                if(out_logs.is_open()){
+                    TestRunner test;
+                    auto example1 = [&](){ tests::TestJsonFiles("../examples/example1/example1.json"s, "../examples/example1/output1.json"s, out_logs); };
+                    RUN_TEST(test, example1);
+
+                }else{
+                    std::cerr << "Ошибка: Log файл " << out_path << " не открыт " << std::endl;
+                }
+            }
+
+            {
+                if(out_logs.is_open()){
+                    TestRunner test;
+                    auto example2 = [&](){ tests::TestJsonFiles("../examples/example2/example2.json"s, "../examples/example2/output2.json"s, out_logs); };
+                    RUN_TEST(test, example2);
+
+                }else{
+                    std::cerr << "Ошибка: Log файл " << out_path << " не открыт " << std::endl;
+                }
+            }
+
+            {
+                if(out_logs.is_open()){
+                    TestRunner test;
+                    auto example3 = [&](){ tests::TestJsonFiles("../examples/example3/example3.json"s, "../examples/example3/output3.json"s, out_logs); };
+                    RUN_TEST(test, example3);
+
+                }else{
+                    std::cerr << "Ошибка: Log файл " << out_path << " не открыт " << std::endl;
+                }
+            }
+            out_logs.close();
+        }
+
     }
 }

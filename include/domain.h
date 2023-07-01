@@ -5,11 +5,23 @@
 #include <vector>
 #include <string_view>
 #include <unordered_set>
-#include "include/geo.h"
+#include "../include/geo.h"
 
-namespace tc {
+namespace transport {
 
     namespace domain {
+
+        ///bus_wait_time — время ожидания автобуса на остановке, в минутах.
+        /// Считайте, что когда бы человек ни пришёл на остановку и какой бы ни была эта остановка,
+        /// он будет ждать любой автобус в точности указанное количество минут. Значение — целое число от 1 до 1000.
+
+        ///bus_velocity — скорость автобуса, в км/ч. Считайте, что скорость любого автобуса постоянна и в точности равна указанному числу.
+        /// Время стоянки на остановках не учитывается, время разгона и торможения тоже. Значение — вещественное число от 1 до 1000.
+
+        struct RoutingSettings{
+            size_t bus_wait_time;
+            double  bus_velocity;
+        };
 
         struct Stop{
             std::string name;
@@ -57,6 +69,13 @@ namespace tc {
             std::hash<const void*> hasher;
         };
 
+        struct StopHasher{
+            size_t operator() (const Stop* stop) const{
+                return hasher(stop);
+            }
+        private:
+            std::hash<const void*> hasher;
+        };
     }
 }
 

@@ -11,17 +11,18 @@
 #include <cassert>
 #include <sstream>
 #include <unordered_set>
-#include "include/transport_catalogue.h"
-#include "include/domain.h"
-#include "json/json.h"
-#include "include/map_renderer.h"
+#include "../include/transport_catalogue.h"
+#include "../include/domain.h"
+#include "../json/json.h"
+#include "../include/map_renderer.h"
 
-namespace tc {
+namespace transport {
 
     #define JSON_STRUCTURAL_ERROR throw json::ParsingError(" Неправильная структура файла Json "s);
 
     enum class QueryType{
       Route,
+      Bus,
       Stop,
       Map
     };
@@ -35,10 +36,14 @@ namespace tc {
     struct StatRequest{
         size_t id;
         QueryType type;
-        std::string  name;
+        std::string name,
+                    from,
+                    to;
     };
 
     namespace detail {
+
+            constexpr static double KM2MIN = 1000.0 / 60.0;
 
             void LeftTrim(std::string_view& line);
 
@@ -113,17 +118,18 @@ namespace tc {
 
             RenderSettings HandleRenderSettings(const json::Dict& map);
 
+            domain::RoutingSettings HandleRoutingSettings(const json::Dict& map);
 
-            std::pair<std::vector<StatRequest>, RenderSettings> ParseJson(std::istream& in, TransportCatalogue& catalogue);
+            std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings>> ParseJson(std::istream& in, TransportCatalogue& catalogue);
 
             void StrToLower(std::string& s);
 
-            std::pair<std::vector<StatRequest>, RenderSettings> ReadFile(std::filesystem::path file_path,  TransportCatalogue& catalogue, FileType type);
+            std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings>> ReadFile(std::filesystem::path file_path,  TransportCatalogue& catalogue, FileType type);
     }
 
     void ReadByConsole(TransportCatalogue& catalogue);
 
-    std::pair<std::vector<StatRequest>, const RenderSettings> ReadFile(std::filesystem::path path, TransportCatalogue& catalogue);
+    std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings>> ReadFile(std::filesystem::path path, TransportCatalogue& catalogue);
 }
 
 #endif // REQUEST_HANDLER_H
