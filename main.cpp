@@ -21,7 +21,6 @@ int main(){
 #endif
     TransportCatalogue catalogue;
     auto [requests, render_settings, routing_settings] = ReadFile("../tests/tsI_case/tsI_case_input.json"s, catalogue);
-    // TODO:: Должен возвращать TransportCatalogue ? Попробуй поменять user interface после сдачи на тесты
     // auto [requests, render_settings, routing_settings] = detail::ParseJson(std::cin, catalogue);
     DictRenderer render(catalogue, render_settings);
     if(routing_settings.has_value()){

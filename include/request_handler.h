@@ -85,7 +85,7 @@ namespace transport {
                 std::string line;
                 std::getline(in, line);
                 auto vec = SplitIntoWords(line);
-                if(vec.size() > 1){ throw std::invalid_argument(" Ошибка: Неправильный формат ввода "); };
+                if(vec.size() > 1){ throw std::invalid_argument(" Ошибка: Неправильный формат ввода "); }
                 number_lines = std::stoi(std::string(vec[0]));
                 number_lines >= 0 ? (0) : throw std::out_of_range(" Ошибка: Число команд не может быть меньше нуля " + std::to_string(number_lines) + " < 0 ");
                 return number_lines;
@@ -124,12 +124,12 @@ namespace transport {
 
             void StrToLower(std::string& s);
 
-            std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings>> ReadFile(std::filesystem::path file_path,  TransportCatalogue& catalogue, FileType type);
+            std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings>> ReadFile(const std::filesystem::path& file_path,  TransportCatalogue& catalogue, FileType type);
     }
 
     void ReadByConsole(TransportCatalogue& catalogue);
 
-    std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings>> ReadFile(std::filesystem::path path, TransportCatalogue& catalogue);
+    std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings>> ReadFile(const std::filesystem::path& path, TransportCatalogue& catalogue);
 }
 
 #endif // REQUEST_HANDLER_H

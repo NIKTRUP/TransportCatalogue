@@ -19,7 +19,7 @@ namespace transport {
 
     std::vector<std::pair<QueryType, std::string>> ParseOutputQuery(std::istream& in);
 
-    void EqualLogFiles(std::filesystem::path my_log, std::filesystem::path test, std::ostream& out);
+    void EqualLogFiles(const std::filesystem::path& my_log, const std::filesystem::path& test, std::ostream& out);
 
     json::Node GetNotFound(size_t id);
 
@@ -29,10 +29,9 @@ namespace transport {
 
     json::Node GetDict(size_t id, const DictRenderer& renderer);
 
-    json::Node GetRoute(size_t id, const std::string& from,
-                        const std::string& to, const TransportCatalogue& catalogue, const TransportRouter* router );
+    json::Node GetRoute(size_t id, const std::string &from, const std::string &to, const TransportRouter *router);
 
-    void PrintQuery(const std::vector<StatRequest> requests, const TransportCatalogue& catalogue,
+    void PrintQuery(const std::vector<StatRequest>& requests, const TransportCatalogue& catalogue,
                     const DictRenderer& renderer, std::ostream& out = std::cout, const TransportRouter* router = nullptr);
 }
 

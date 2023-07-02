@@ -17,7 +17,7 @@ namespace transport {
     public:
         using Clock = std::chrono::steady_clock;
 
-        LogDuration(const std::string_view id, std::ostream& stream = std::cerr)
+        explicit LogDuration(const std::string_view id, std::ostream& stream = std::cerr)
             : stream_(stream), id_(id){
         }
 

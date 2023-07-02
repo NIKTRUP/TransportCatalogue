@@ -35,17 +35,17 @@ namespace transport {
 
         void TestJSON();
 
-        void TestTxtFiles(std::filesystem::path test_path, std::filesystem::path standard_path, std::ostream& out_logs = std::cout);
+        void TestTxtFiles(const std::filesystem::path& test_path, const std::filesystem::path& standard_path, std::ostream& out_logs = std::cout);
 
-        void TestJsonFiles(std::filesystem::path test_path, std::filesystem::path standard_path, std::ostream& out_logs = std::cout);
+        void TestJsonFiles(const std::filesystem::path& test_path, const std::filesystem::path& standard_path, std::ostream& out_logs = std::cout);
 
-        void TestSvgFiles(std::filesystem::path test_path, std::filesystem::path standard_path, std::ostream& out_logs);
+        void TestSvgFiles(const std::filesystem::path& test_path, const std::filesystem::path& standard_path, std::ostream& out_logs);
 
         std::vector<double> LoadRouteTime(std::istream& in);
 
-        std::vector<double> LoadRouteTime(std::filesystem::path test_path);
+        std::vector<double> LoadRouteTime(const std::filesystem::path& test_path);
 
-        void CheckFindingOptimalRoute(std::filesystem::path test_in, std::filesystem::path standard_out, std::filesystem::path out_log);
+        void CheckFindingOptimalRoute(const std::filesystem::path& test_in, const std::filesystem::path& standard_out, const std::filesystem::path& out_log);
 
         void TestFindingOptimalRoute();
 

@@ -1,4 +1,3 @@
-
 #ifndef GEO_H
 #define GEO_H
 #define _USE_MATH_DEFINES

@@ -14,7 +14,7 @@ namespace transport {
             }  catch (...) {
                 out<< "Bus " << name << ": not found" << std::endl;
             }
-            if(check == true){
+            if(check){
                 out << std::setprecision(6);
                 out << "Bus " << info.name << ": "
                           << info.stop_count << " stops on route, "
@@ -84,13 +84,13 @@ namespace transport {
                  line_view.remove_prefix(end_type+1);
                  Trim(line_view);
 
-                 queries.push_back({type_mode ,std::string(line_view)});
+                 queries.emplace_back(type_mode ,std::string(line_view));
             }
             return queries;
         }
 
 
-        void EqualLogFiles(std::filesystem::path my_log, std::filesystem::path test, std::ostream& out){
+        void EqualLogFiles(const std::filesystem::path& my_log, const std::filesystem::path& test, std::ostream& out){
             using namespace std::literals;
             std::ifstream in1(my_log.string());
             std::ifstream in2(test.string());
@@ -156,7 +156,7 @@ namespace transport {
         json::Node GetBus(size_t id, const std::string& name, const TransportCatalogue& catalogue){
             using namespace std::literals;
             domain::RouteInfo info;
-            bool check = false;
+            bool check;
             json::Node not_found, route_info;
 
             try {
@@ -166,7 +166,7 @@ namespace transport {
                 return GetNotFound(id);
             }
 
-            if(check == true){
+            if(check){
                 route_info = json::Builder{}
                              .StartDict()
                                 .Key("curvature"s).Value(info.curvature)
@@ -192,30 +192,29 @@ namespace transport {
                     .Build();
         }
 
-        json::Node GetRoute(size_t id, const std::string& from,
-                            const std::string& to, const TransportCatalogue& catalogue, const TransportRouter* router){
+        json::Node GetRoute(size_t id, const std::string &from, const std::string &to, const TransportRouter *router) {
             using namespace std::literals;
             json::Builder builder;
             auto route = router->FindRoute(from, to);
             if(route.has_value()){
                 double total_time = 0;
-                int wait_time = router->GetSettings().bus_wait_time;
+                int bus_wait_time = static_cast<int>(router->GetSettings().bus_wait_time);
                 json::Array items;
                 for (const auto &edge : route.value()) {
                     total_time += edge.time;
-                    json::Dict wait_elem = json::Builder{}.StartDict().
+                    json::Dict wait_item = json::Builder{}.StartDict().
                             Key("type"s).Value("Wait"s).
                             Key("stop_name"s).Value(std::string(edge.stop_name)).
-                            Key("time"s).Value(wait_time).
+                            Key("time"s).Value(bus_wait_time).
                             EndDict().Build().AsDict();
-                    json::Dict ride_elem = json::Builder{}.StartDict().
+                    json::Dict ride_item = json::Builder{}.StartDict().
                             Key("type"s).Value("Bus"s).
                             Key("bus"s).Value(std::string(edge.bus_name)).
                             Key("span_count"s).Value(static_cast<int>(edge.span_count)).
-                            Key("time"s).Value(edge.time - wait_time).
+                            Key("time"s).Value(edge.time - bus_wait_time).
                             EndDict().Build().AsDict();
-                    items.push_back(wait_elem);
-                    items.push_back(ride_elem);
+                    items.emplace_back(wait_item);
+                    items.emplace_back(ride_item);
                 }
                 return json::Builder{}.StartDict().
                         Key("request_id"s).Value(static_cast<int>(id)).
@@ -227,31 +226,7 @@ namespace transport {
             return GetNotFound(static_cast<int>(id));
         }
 
-//    builder.StartDict()
-//    .Key("request_id"s).Value(static_cast<int>(id))
-//    .Key("time"s).Value(route->total_time)
-//    .Key("items"s).StartArray();
-//    for(size_t i = 0 ; i < route->activities.size(); ++i){
-//    if(route->activities[i].type == ActivityType::Wait){
-//    builder.StartDict()
-//    .Key("type"s).Value("Wait"s)
-//    .Key("stop_name"s).Value(route->activities[i].stop_name)
-//    .Key("time"s).Value(route->activities[i].time)
-//    .EndDict();
-//}else if(route->activities[i].type == ActivityType::Bus){
-//builder.StartDict()
-//.Key("type"s).Value("Bus"s)
-//.Key("bus_name"s).Value(route->activities[i].bus_name)
-//.Key("span_count").Value(static_cast<int>(route->activities[i].span_count))
-//.Key("time"s).Value(route->activities[i].time)
-//.EndDict();
-//}
-//}
-//builder.EndArray()
-//.EndDict();
-//return builder.Build();
-
-        void PrintQuery(const std::vector<StatRequest> requests, const TransportCatalogue& catalogue,
+        void PrintQuery(const std::vector<StatRequest>& requests, const TransportCatalogue& catalogue,
                         const DictRenderer& renderer, std::ostream& out, const TransportRouter* router){
             using namespace std::literals;
 
@@ -261,12 +236,12 @@ namespace transport {
                 }else if(request.type == QueryType::Bus){
                     return GetBus(request.id, request.name, catalogue);
                 }else if(request.type == QueryType::Map){
-                    if(renderer.GetSettings().is_init == true){
+                    if(renderer.GetSettings().is_init){
                         return GetDict(request.id, renderer);
                     }
                 }else if(request.type == QueryType::Route){
                     if(router != nullptr){
-                        return GetRoute(request.id, request.from, request.to, catalogue, router);
+                        return GetRoute(request.id, request.from, request.to, router);
                     }else{
                         throw std::logic_error("Нет настроек ожидания на остановке и скорости автобусов");
                     }

@@ -1,7 +1,7 @@
 #ifndef MAP_RENDERER_H
 #define MAP_RENDERER_H
 
-#include "geo.h"
+#include "../include/geo.h"
 #include "../svg/svg.h"
 
 #include <algorithm>
@@ -108,9 +108,9 @@ namespace transport {
 
         void Print(std::ostream& out) const;
 
-        const RenderSettings& GetSettings() const;
+        [[nodiscard]] const RenderSettings& GetSettings() const;
 
-        const svg::Document& GetDocument() const;
+        [[nodiscard]] const svg::Document& GetDocument() const;
 
     private:
         void AddLines(const SphereProjector& projector);

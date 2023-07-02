@@ -30,7 +30,7 @@ namespace {
         if (!input) {
             throw ParsingError("Array parsing error"s);
         }
-        return Node(std::move(result));
+        return Node{std::move(result)};
     }
 
     Node LoadDict(std::istream& input) {
@@ -54,7 +54,7 @@ namespace {
         if (!input) {
             throw ParsingError("Dictionary parsing error"s);
         }
-        return Node(std::move(dict));
+        return Node{std::move(dict)};
     }
 
     Node LoadString(std::istream& input) {
@@ -102,7 +102,7 @@ namespace {
             ++it;
         }
 
-        return Node(std::move(s));
+        return Node{std::move(s)};
     }
 
     Node LoadBool(std::istream& input) {
@@ -233,12 +233,12 @@ namespace {
             }
         }
 
-        PrintContext Indented() const {
+        [[nodiscard]] PrintContext Indented() const {
             return {out, indent_step, indent_step + indent};
         }
     };
 
-    void PrintNode(const Node& value, const PrintContext& ctx);
+    void PrintNode(const Node& node, const PrintContext& ctx);
 
     template <typename Value>
     void PrintValue(const Value& value, const PrintContext& ctx) {
@@ -250,10 +250,10 @@ namespace {
         for (const char c : value) {
             switch (c) {
                 case '\r':
-                    out << "\\r"sv;
+                    out << R"(\r)";
                     break;
                 case '\n':
-                    out << "\\n"sv;
+                    out << R"(\n)";
                     break;
                 case '"':
                     // Символы " и \ выводятся как \" или \\, соответственно

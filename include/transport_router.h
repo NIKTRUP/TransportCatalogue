@@ -5,15 +5,16 @@
 #include "../include/transport_catalogue.h"
 namespace transport {
 
-    struct RouteWeight {
+    struct TransportWeight {
         std::string_view bus_name;
         size_t span_count = 0;
         double time = 0;
     };
 
-    bool operator<(const RouteWeight &left, const RouteWeight &right);
-    bool operator>(const RouteWeight &left, const RouteWeight &right);
-    RouteWeight operator+(const RouteWeight &left, const RouteWeight &right);
+    TransportWeight operator+(const TransportWeight &lhs, const TransportWeight &rhs);
+    bool operator<(const TransportWeight &lhs, const TransportWeight &rhs);
+    bool operator>(const TransportWeight &lhs, const TransportWeight &rhs);
+
 
     struct UserActivity{
         std::string stop_name,
@@ -23,14 +24,12 @@ namespace transport {
     };
 
     class TransportRouter {
-        using Router = graph::Router<RouteWeight>;
-        using Graph = graph::DirectedWeightedGraph<RouteWeight>;
+        using Router = graph::Router<TransportWeight>;
+        using Graph = graph::DirectedWeightedGraph<TransportWeight>;
 
     public:
 
         TransportRouter(const TransportCatalogue& catalogue, domain::RoutingSettings settings);
-
-        TransportRouter(const TransportCatalogue& catalogue, domain::RoutingSettings settings, const Graph& graph);
 
         domain::RoutingSettings GetSettings() const;
 
@@ -47,11 +46,10 @@ namespace transport {
 
     private:
 
-        Graph BuildGraph();
         void InitVertexes();
-        double ComputeRouteTime(const domain::Route *route, int stop_from_index, int stop_to_index);
-        graph::Edge<RouteWeight> MakeEdge(const domain::Route *route,
-                                          int stop_from_index, int stop_to_index);
+        graph::Edge<TransportWeight> CreateEdge(const domain::Route *route, size_t from_id, size_t to_id);
+        double CalculateRouteTime(const domain::Route *route, size_t from_id, size_t to_id);
+        Graph BuildGraph();
     };
 } // namespace router
 

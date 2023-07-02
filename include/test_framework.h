@@ -90,7 +90,7 @@ namespace transport {
      */
     template <class T, class U>
     void AssertEqual(const T& t, const U& u, const std::string& hint = {}) {
-        if (!(t == u)) {
+        if (t != u) {
             std::ostringstream os;
             os << "Assertion failed: " << t << " != " << u;
             if (!hint.empty()) {

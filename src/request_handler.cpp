@@ -34,7 +34,7 @@ namespace transport {
 
                 while (!str.empty()) {
                     size_t space = str.find(' ');
-                    result.push_back(space == str.npos ? str.substr(0) : str.substr(0, space));
+                    result.push_back(space == std::string_view::npos ? str.substr(0) : str.substr(0, space));
                     str.remove_prefix(result.back().size());
                     str.remove_prefix(std::min(str.find_first_not_of(' '), str.size()));
                 }
@@ -54,7 +54,7 @@ namespace transport {
             }
 
             std::pair<std::string, geo::Coordinates> ParseStopQuery(string_view line){
-                auto end_latitude = line.find(",");
+                auto end_latitude = line.find(',');
                 auto str_latitude = line.substr(0, end_latitude);
 
                 auto trim = [](string_view str){
@@ -65,7 +65,7 @@ namespace transport {
 
                 line.remove_prefix(end_latitude + 1);
 
-                auto eld_longitude = std::min(line.find(","), line.size());
+                auto eld_longitude = std::min(line.find(','), line.size());
                 auto str_longitude = line.substr(0, eld_longitude);
                 trim(str_longitude);
                 line.remove_prefix(std::min(eld_longitude + 1, line.size()));
@@ -89,7 +89,7 @@ namespace transport {
 
                 RouteType type = RouteType::UNKNOWN;
                 std::vector<Stop> stops;
-                char sep = ' ';
+                char sep;
                 size_t first_pos = 0;
                 for (size_t i = 0; i < line.size(); ++i) {
                     if(line[i] == '-'){
@@ -129,7 +129,7 @@ namespace transport {
                     std::string_view str_view_distances = str_distances;
 
                     while(!str_view_distances.empty()){
-                        auto pos_sep = std::min(str_view_distances.find(","), str_view_distances.size());
+                        auto pos_sep = std::min(str_view_distances.find(','), str_view_distances.size());
                         std::string_view line = str_view_distances.substr(0, pos_sep);
                         std::string_view distance_stop = line;
 
@@ -162,7 +162,7 @@ namespace transport {
                         if(!distance_stops.empty()){
                              stop_to_distances[name] = std::move(distance_stops);
                         }
-                        catalogue.AddStop({std::move(name), std::move(coordinate)});
+                        catalogue.AddStop({std::move(name), coordinate});
                     }else if(query_type == "Bus"s || query_type == "bus_name"){
                         if(!route_name_stops.count(name)){
                             route_name_stops[std::move(name)] = line.substr(line.find(":"s)+1);
@@ -175,7 +175,7 @@ namespace transport {
                 for(auto& [route_name, raw_stops] : route_name_stops){
                     auto [type, route_stops] = ParseRouteQuery(raw_stops);
                     domain::Route route;
-                    route.name = std::move(route_name);
+                    route.name = route_name;
                     route.route_type = type;
                     for(auto& stop : route_stops){
                         route.stops.push_back(catalogue.FindStop(stop.name));
@@ -194,7 +194,7 @@ namespace transport {
                 if(it_distances != map.end()){
                    auto distances = it_distances->second.AsDict();
                    for(auto& [stop_name, distance ]: distances){
-                       stops_distances.push_back({stop_name, static_cast<size_t>(distance.AsInt())});
+                       stops_distances.emplace_back(stop_name, static_cast<size_t>(distance.AsInt()));
                    }
                    stop_to_distances[stop.name] = stops_distances;
                 }
@@ -226,11 +226,11 @@ namespace transport {
                         }
 
                         if(type == "Bus"s || type == "bus_name"s){
-                            routes.push_back(map);
+                            routes.emplace_back(map);
                         }
 
                     }else{
-                        JSON_STRUCTURAL_ERROR;
+                        JSON_STRUCTURAL_ERROR
                     }
                 }
 
@@ -333,7 +333,7 @@ namespace transport {
                         }else if(array_color.size() == 3){
                             settings.underlayer_color = svg::Rgb(array_color[0].AsInt(), array_color[1].AsInt(), array_color[2].AsInt());
                         }else{
-                            JSON_STRUCTURAL_ERROR;
+                            JSON_STRUCTURAL_ERROR
                         }
                     }else if(underlayer_color_map.IsString()){
                         settings.underlayer_color = underlayer_color_map.AsString();
@@ -347,14 +347,14 @@ namespace transport {
                         if(color_palette.IsArray()){
                             auto array_color = color_palette.AsArray();
                             if(array_color.size() == 4){
-                                settings.color_palette.push_back(svg::Rgba(array_color[0].AsInt(), array_color[1].AsInt(), array_color[2].AsInt(), array_color[3].AsDouble()));
+                                settings.color_palette.emplace_back(svg::Rgba(array_color[0].AsInt(), array_color[1].AsInt(), array_color[2].AsInt(), array_color[3].AsDouble()));
                             }else if(array_color.size() == 3){
-                                settings.color_palette.push_back(svg::Rgb(array_color[0].AsInt(), array_color[1].AsInt(), array_color[2].AsInt()));
+                                settings.color_palette.emplace_back(svg::Rgb(array_color[0].AsInt(), array_color[1].AsInt(), array_color[2].AsInt()));
                             }else{
-                                JSON_STRUCTURAL_ERROR;
+                                JSON_STRUCTURAL_ERROR
                             }
                         }else if(color_palette.IsString()){
-                            settings.color_palette.push_back(color_palette.AsString());
+                            settings.color_palette.emplace_back(color_palette.AsString());
                         }
                     }
                 }
@@ -364,10 +364,9 @@ namespace transport {
             }
 
             domain::RoutingSettings HandleRoutingSettings(const json::Dict& map){
-                domain::RoutingSettings routing;
-                routing.bus_wait_time = map.at("bus_wait_time"s).AsInt();
-                routing.bus_velocity = map.at("bus_velocity"s).AsDouble()*KM2MIN;
-                return routing;
+                size_t bus_wait_time = map.at("bus_wait_time"s).AsInt();
+                double bus_velocity = map.at("bus_velocity"s).AsDouble()*KM2MIN;
+                return domain::RoutingSettings{bus_wait_time, bus_velocity};
             }
 
             std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings >> ParseJson(std::istream& in, TransportCatalogue& catalogue){
@@ -378,7 +377,7 @@ namespace transport {
                 std::optional<transport::domain::RoutingSettings> routing;
 
                 json::Document base_stat_requests = json::Load(in);
-                json::Node root = base_stat_requests.GetRoot();
+                const json::Node& root = base_stat_requests.GetRoot();
                 if(root.IsDict()){
                     json::Dict map_requests = root.AsDict();
                     auto it_base = map_requests.find("base_requests"s);
@@ -411,19 +410,20 @@ namespace transport {
                     }
 
                 }else{
-                    JSON_STRUCTURAL_ERROR;
+                    JSON_STRUCTURAL_ERROR
                 }
                 return {out, renderer, routing};
             }
 
             void StrToLower(std::string& s) {
                 std::transform(s.begin(), s.end(), s.begin(),
-                               [](unsigned c){ return std::tolower(c); }
+                               [](unsigned c){ return std::tolower(static_cast<int>(c)); }
                               );
             }
 
             // на будущее
-            std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings >> ReadFile(std::filesystem::path file_path,  TransportCatalogue& catalogue, FileType type){
+            std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings >>
+                    ReadFile(const std::filesystem::path& file_path,  TransportCatalogue& catalogue, FileType type){
                 using namespace std;
 
                 std::ifstream in(file_path);
@@ -431,14 +431,11 @@ namespace transport {
 
                     switch (type) {
                     case FileType::XML:
-                                throw std::runtime_error(" Пока функциональность не реализована ");
-                        break;
+                            throw std::runtime_error(" Пока функциональность не реализована ");
                     case FileType::JSON:
-                                return ParseJson(in, catalogue);
-                        break;
+                            return ParseJson(in, catalogue);
                     case FileType::INI:
-                                throw std::runtime_error(" Пока функциональность не реализована ");
-                        break;
+                            throw std::runtime_error(" Пока функциональность не реализована ");
                     default:
                         break;
                     }
@@ -454,7 +451,8 @@ namespace transport {
         detail::ParseTxt(std::cin, catalogue);
     }
 
-    std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<transport::domain::RoutingSettings>> ReadFile(std::filesystem::path file_path, TransportCatalogue& catalogue){
+    std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<transport::domain::RoutingSettings>>
+                                                        ReadFile(const std::filesystem::path& file_path, TransportCatalogue& catalogue){
         using namespace std;
         auto extension = file_path.extension().string();
         detail::StrToLower(extension);

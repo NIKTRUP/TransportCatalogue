@@ -39,12 +39,12 @@ namespace graph {
         EdgeId AddEdge(const Edge<Weight>& edge);
 
         // Возвращает количество вершин
-        size_t GetVertexCount() const;
+        [[nodiscard]] size_t GetVertexCount() const;
         // Возвращает количество рёбер
-        size_t GetEdgeCount() const;
+        [[nodiscard]] size_t GetEdgeCount() const;
         // Возвращает ребро по его id
         const Edge<Weight>& GetEdge(EdgeId edge_id) const;
-        IncidentEdgesRange GetIncidentEdges(VertexId vertex) const;
+        [[nodiscard]] IncidentEdgesRange GetIncidentEdges(VertexId vertex) const;
 
     private:
         std::vector<Edge<Weight>> edges_;

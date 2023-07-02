@@ -8,7 +8,7 @@ DictRenderer::DictRenderer(const TransportCatalogue& catalogue, const RenderSett
     settings_(settings),
     catalogue_(catalogue){
 
-    if(settings.is_init == true){
+    if(settings.is_init){
         const auto& buses = catalogue_.GetRoutes();
         std::vector<geo::Coordinates> geo_coords;
         for (const auto& bus : buses) {

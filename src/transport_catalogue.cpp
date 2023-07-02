@@ -61,11 +61,9 @@ namespace transport {
     }
 
     void TransportCatalogue::AddRoute(Route route) noexcept{
-        // добавляем маршрут в хранилище и в индекс
-        routes_.push_back(move(route));
+        routes_.push_back(std::move(route));
         string_view route_name = routes_.back().name;
         routes_by_names_.insert({route_name, &routes_.back()});
-        // добавляем информацию об автобусе в остановки по маршруту
         for (auto stop : routes_.back().stops) {
             buses_on_stop_[stop->name].insert(route_name);
         }
@@ -90,7 +88,7 @@ namespace transport {
         result.stop_count = CountStops(route);
         result.unique_stop_count = CountUniqueStops(route);
         result.route_length_geo = CalculateRouteLengthGeo(route);
-        result.route_length = CalculateRouteLength(route);
+        result.route_length = static_cast<double>(CalculateRouteLength(route));
         result.curvature = static_cast<double>(result.route_length) / result.route_length_geo;
         return result;
     }
