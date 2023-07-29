@@ -10,7 +10,6 @@ namespace transport {
                 line.remove_prefix(std::min(line.find_first_not_of(' '), line.size()));
             }
 
-            // Как это оптимизировать (долго будет работать)
             void RightTrim(string_view& line) {
                 size_t pos = 0;
                 for(auto it = line.rbegin(); it != line.rend(); ++it){
@@ -22,7 +21,6 @@ namespace transport {
                 line.remove_suffix(std::min(pos, line.size()));
             }
 
-            // Как это оптимизировать (долго будет работать)
             void Trim(string_view& line) {
                 LeftTrim(line);
                 RightTrim(line);
@@ -369,17 +367,27 @@ namespace transport {
                 return domain::RoutingSettings{bus_wait_time, bus_velocity};
             }
 
-            std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings >> ParseJson(std::istream& in, TransportCatalogue& catalogue){
+            std::tuple<std::vector<StatRequest>,
+                    RenderSettings,
+                    std::optional<domain::RoutingSettings>,
+                    std::optional<domain::SerializationSettings>> ParseJson(std::istream& in, TransportCatalogue& catalogue){
                 std::vector<StatRequest> out;
                 std::unordered_map<string, string> route_name_stops;
                 std::unordered_map<string, string> stop_to_distances;
                 RenderSettings renderer;
                 std::optional<transport::domain::RoutingSettings> routing;
+                std::optional<domain::SerializationSettings> serialization_settins;
 
                 json::Document base_stat_requests = json::Load(in);
                 const json::Node& root = base_stat_requests.GetRoot();
                 if(root.IsDict()){
                     json::Dict map_requests = root.AsDict();
+                    auto it_ser_settings = map_requests.find("serialization_settings"s);
+                    if(it_ser_settings != map_requests.end()){
+                        if(it_ser_settings->second.IsDict()){
+                            serialization_settins = {it_ser_settings->second.AsDict().at("file"s).AsString()};
+                        }
+                    }
                     auto it_base = map_requests.find("base_requests"s);
                     if(it_base != map_requests.end()){
                         if(it_base->second.IsArray()){
@@ -412,7 +420,7 @@ namespace transport {
                 }else{
                     JSON_STRUCTURAL_ERROR
                 }
-                return {out, renderer, routing};
+                return {out, renderer, routing, serialization_settins};
             }
 
             void StrToLower(std::string& s) {
@@ -422,7 +430,7 @@ namespace transport {
             }
 
             // на будущее
-            std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings >>
+            std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings >, std::optional<domain::SerializationSettings>>
                     ReadFile(const std::filesystem::path& file_path,  TransportCatalogue& catalogue, FileType type){
                 using namespace std;
 
@@ -443,7 +451,7 @@ namespace transport {
                     throw std::invalid_argument(" Ошибка: Такого файла не существует. Проверьте путь к файлу: "s +  file_path.string());
                 }
                 in.close();
-                return {std::vector<StatRequest>{}, RenderSettings{}, transport::domain::RoutingSettings{}};
+                return {std::vector<StatRequest>{}, RenderSettings{}, transport::domain::RoutingSettings{}, domain::SerializationSettings{}};
             }
     }
 
@@ -451,7 +459,7 @@ namespace transport {
         detail::ParseTxt(std::cin, catalogue);
     }
 
-    std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<transport::domain::RoutingSettings>>
+    std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<transport::domain::RoutingSettings>, std::optional<domain::SerializationSettings>>
                                                         ReadFile(const std::filesystem::path& file_path, TransportCatalogue& catalogue){
         using namespace std;
         auto extension = file_path.extension().string();

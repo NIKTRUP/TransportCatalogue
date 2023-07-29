@@ -120,16 +120,25 @@ namespace transport {
 
             domain::RoutingSettings HandleRoutingSettings(const json::Dict& map);
 
-            std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings>> ParseJson(std::istream& in, TransportCatalogue& catalogue);
+            std::tuple<std::vector<StatRequest>,
+                    RenderSettings, std::optional<domain::RoutingSettings>,
+                    std::optional<domain::SerializationSettings>> ParseJson(std::istream& in, TransportCatalogue& catalogue);
 
             void StrToLower(std::string& s);
 
-            std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings>> ReadFile(const std::filesystem::path& file_path,  TransportCatalogue& catalogue, FileType type);
+            std::tuple<std::vector<StatRequest>,
+                RenderSettings,
+                std::optional<domain::RoutingSettings>,
+                std::optional<domain::SerializationSettings>>
+                    ReadFile(const std::filesystem::path& file_path,  TransportCatalogue& catalogue, FileType type);
     }
 
     void ReadByConsole(TransportCatalogue& catalogue);
 
-    std::tuple<std::vector<StatRequest>, RenderSettings, std::optional<domain::RoutingSettings>> ReadFile(const std::filesystem::path& path, TransportCatalogue& catalogue);
+    std::tuple<std::vector<StatRequest>,
+            RenderSettings,
+            std::optional<domain::RoutingSettings>,
+            std::optional<domain::SerializationSettings>> ReadFile(const std::filesystem::path& path, TransportCatalogue& catalogue);
 }
 
 #endif // REQUEST_HANDLER_H

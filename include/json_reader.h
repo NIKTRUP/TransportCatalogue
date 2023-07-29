@@ -27,12 +27,12 @@ namespace transport {
 
     json::Node GetBus(size_t id, const std::string& name, const TransportCatalogue& catalogue);
 
-    json::Node GetDict(size_t id, const DictRenderer& renderer);
+    json::Node GetDict(size_t id, const MapRenderer& renderer);
 
     json::Node GetRoute(size_t id, const std::string &from, const std::string &to, const TransportRouter *router);
 
     void PrintQuery(const std::vector<StatRequest>& requests, const TransportCatalogue& catalogue,
-                    const DictRenderer& renderer, std::ostream& out = std::cout, const TransportRouter* router = nullptr);
+                    const MapRenderer& renderer, std::ostream& out = std::cout, const TransportRouter* router = nullptr);
 }
 
 #endif // STAT_READER_H

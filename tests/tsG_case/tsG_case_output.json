@@ -13664,7 +13664,7 @@
             }
         ],
         "request_id": 1440595467,
-        "total_time": 902.21
+        "total_time": 902.211
     },
     {
         "items": [
@@ -24583,7 +24583,7 @@
             }
         ],
         "request_id": 1131740254,
-        "total_time": 864.897
+        "total_time": 864.896
     },
     {
         "curvature": 578.047,
@@ -26293,7 +26293,7 @@
             }
         ],
         "request_id": 1933446366,
-        "total_time": 909.899
+        "total_time": 909.9
     },
     {
         "items": [
@@ -40119,7 +40119,7 @@
             }
         ],
         "request_id": 1354702004,
-        "total_time": 843.234
+        "total_time": 843.233
     },
     {
         "buses": [
@@ -40816,7 +40816,7 @@
             }
         ],
         "request_id": 1155138745,
-        "total_time": 864.897
+        "total_time": 864.896
     },
     {
         "items": [
@@ -42595,6 +42595,6 @@
             }
         ],
         "request_id": 1357064407,
-        "total_time": 904.895
+        "total_time": 904.896
     }
 ]

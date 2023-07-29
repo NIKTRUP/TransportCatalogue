@@ -22,14 +22,41 @@ namespace transport{
         router_ = std::make_unique<Router>(graph_);
     }
 
+    TransportRouter::TransportRouter(const transport::TransportCatalogue & catalogue,
+                    const std::unordered_map<graph::VertexId, std::string_view>& id_to_stop_name,
+                    const std::unordered_map<std::string_view, graph::VertexId>& stop_name_to_id,
+                    const Graph& graph,
+                    const Router::RoutesInternalData & internal_data, domain::RoutingSettings settings)
+                    : catalogue_(catalogue), id_to_stop_name_(id_to_stop_name),
+                    stop_name_to_id_(stop_name_to_id), graph_(graph), settings_(settings)
+    {
+        router_ = std::make_unique<Router>(graph_, internal_data);
+    }
+
     domain::RoutingSettings TransportRouter::GetSettings() const{
         return settings_;
+    }
+
+    const std::unordered_map<graph::VertexId, std::string_view>& TransportRouter::GetIdToStopName() const{
+        return id_to_stop_name_;
+    }
+
+    const std::unordered_map<std::string_view, graph::VertexId> & TransportRouter::GetStopNameToId() const{
+        return stop_name_to_id_;
+    }
+
+    const TransportRouter::Graph& TransportRouter::GetGraph() const{
+        return graph_;
+    }
+
+    const TransportRouter::Router::RoutesInternalData& TransportRouter::GetRoutesInternalData() const{
+        return router_->GetRoutesInternalData();
     }
 
     std::optional<std::vector<UserActivity>> TransportRouter::FindRoute(const std::string& from, const std::string& to) const{
         std::vector<UserActivity> found_route;
 
-        if (from == to) { return found_route; }
+        if (from == to || id_to_stop_name_.empty() || stop_name_to_id_.empty()) { return found_route; }
 
         auto route = router_->BuildRoute(stop_name_to_id_.at(from), stop_name_to_id_.at(to));
         if (!route.has_value()) {

@@ -45,9 +45,16 @@ namespace transport {
 
         std::vector<double> LoadRouteTime(const std::filesystem::path& test_path);
 
-        void CheckFindingOptimalRoute(const std::filesystem::path& test_in, const std::filesystem::path& standard_out, const std::filesystem::path& out_log);
+        bool CheckRouteTime(std::istream& in, std::istream& in_standard, double eps = 1e-2);
+
+        bool CheckFindingOptimalRoute(const std::filesystem::path& test_in, const std::filesystem::path& standard_out);
 
         void TestFindingOptimalRoute();
+
+        void CheckMakeBaseAndProcessRequests(const std::filesystem::path& file, const std::filesystem::path& requests_test_in,
+                                             const std::filesystem::path& standard_out, bool check_optimal_route = false);
+
+        void TestMakeBaseAndProcessRequestsModes();
 
         void TestProject();
 

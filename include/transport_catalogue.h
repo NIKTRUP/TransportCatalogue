@@ -79,6 +79,7 @@ namespace transport {
        size_t CalculateRouteLength(const domain::Route* route) const;
 
     private:
+
        // остановки
        std::deque<domain::Stop> stops_;
        // Формат хранения: имя_остановки - указатель_на_остановку
@@ -90,7 +91,7 @@ namespace transport {
        // Формат хранения для поиска: имя_маршрута(совпадает с именем автобуса) - указатель на маршрут
        UnMapNameToRoute routes_by_names_;
        // расчёт расстояний между остановками (в метрах).
-       UnMapStopsToDistance distance_stops;
+       UnMapStopsToDistance distance_stops_;
     };
 
 }

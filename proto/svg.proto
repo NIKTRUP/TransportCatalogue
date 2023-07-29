@@ -1,0 +1,21 @@
+  syntax = "proto3";
+
+  package transport_serialize;
+
+  message Point{
+    double x = 1;
+    double y = 2;
+  }
+
+  message Rgba {
+    uint32 red = 1;
+    uint32 green = 2;
+    uint32 blue = 3;
+    double opacity = 4;
+  }
+
+  message Color {
+    Rgba rgba = 1;
+    string name = 2;
+    bool is_rgba = 3;
+  }

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+import "graph.proto";
+
+package transport_serialize;
+
+message StopById {
+  uint32 id = 1;
+  uint32 stop_id = 2;
+}
+
+message RoutingSettings {
+  uint32 bus_wait_time = 1;
+  double bus_velocity = 2;
+}
+
+message TransportRouter {
+  RoutingSettings settings = 1;
+  repeated StopById stop_by_id = 2;
+  Graph graph = 3;
+  Router router = 4;
+}

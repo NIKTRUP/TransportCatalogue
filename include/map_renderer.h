@@ -101,10 +101,10 @@ namespace transport {
        bool is_init = false;
     };
 
-    class DictRenderer {
+    class MapRenderer {
     public:
 
-        DictRenderer(const TransportCatalogue& catalogue, const RenderSettings& settings);
+        MapRenderer(const TransportCatalogue& catalogue, const RenderSettings& settings);
 
         void Print(std::ostream& out) const;
 

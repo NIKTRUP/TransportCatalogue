@@ -1,4 +1,4 @@
-#include "../include/stat_reader.h"
+#include "../include/json_reader.h"
 
 namespace transport {
 
@@ -180,7 +180,7 @@ namespace transport {
             return route_info;
         }
 
-        json::Node GetDict(size_t id, const DictRenderer& renderer){
+        json::Node GetDict(size_t id, const MapRenderer& renderer){
             using namespace std::literals;
             std::ostringstream ss;
             renderer.Print(ss);
@@ -227,7 +227,7 @@ namespace transport {
         }
 
         void PrintQuery(const std::vector<StatRequest>& requests, const TransportCatalogue& catalogue,
-                        const DictRenderer& renderer, std::ostream& out, const TransportRouter* router){
+                        const MapRenderer& renderer, std::ostream& out, const TransportRouter* router){
             using namespace std::literals;
 
             auto get_response = [&catalogue, &renderer, &router](const StatRequest& request){

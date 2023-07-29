@@ -1,5 +1,6 @@
 #include "../include/tests.h"
-#include "../include/stat_reader.h"
+#include "../include/json_reader.h"
+#include "../include/serialization.h"
 
 using namespace std;
 
@@ -958,8 +959,8 @@ namespace transport {
                     append(test_path.stem().string()).string().
                     append("_my_result.log"s);
 
-            auto [out, render_settings, routing_settings] = ReadFile(test_path, catalogue);
-            DictRenderer render(catalogue, render_settings);
+            auto [out, render_settings, routing_settings, _] = ReadFile(test_path, catalogue);
+            MapRenderer render(catalogue, render_settings);
             std::ofstream out_stream(result_path.string());
             if(out_stream.is_open()){
                 PrintQuery(out , catalogue, render, out_stream);
@@ -980,8 +981,8 @@ namespace transport {
                     append("_my_result.log"s);
 
 
-            auto [out, render_settings, routing_settings] = ReadFile(test_path, catalogue);
-            DictRenderer render(catalogue, render_settings);
+            auto [out, render_settings, routing_settings, _] = ReadFile(test_path, catalogue);
+            MapRenderer render(catalogue, render_settings);
             std::ofstream out_stream(result_path.string());
             if(out_stream.is_open()){
                 render.Print(out_stream);
@@ -1024,11 +1025,26 @@ namespace transport {
             return route_times;
         }
 
-        void CheckFindingOptimalRoute(const path& test_in, const path& standard_out, const path& out_log){
+        bool CheckRouteTime(std::istream& in, std::istream& in_standard, double eps){
+            auto route_times = LoadRouteTime(in);
+            auto test_route_time = LoadRouteTime(in_standard);
+            bool check = true;
+            for (size_t i = 0; i <  route_times.size(); ++i) {
+                if(std::abs(route_times[i] - test_route_time[i]) >= eps){
+                    std::cerr << " В " << i << " запросе на оптимальный маршрут есть различия с эталоном "
+                              << " Мой результат = " << route_times[i]
+                              << ", В тестах = " << test_route_time[i] << std::endl;
+                    check = false;
+                }
+            }
+            return check;
+        }
+
+        bool CheckFindingOptimalRoute(const path& test_in, const path& standard_out){
             double eps = 1e-16;
             TransportCatalogue catalogue;
-            auto [requests, render_settings, routing_settings] = ReadFile(test_in, catalogue);
-            DictRenderer render(catalogue, render_settings);
+            auto [requests, render_settings, routing_settings, _] = ReadFile(test_in, catalogue);
+            MapRenderer render(catalogue, render_settings);
             std::stringstream ss;
             if(routing_settings.has_value()){
                 TransportRouter router(catalogue, routing_settings.value());
@@ -1037,65 +1053,147 @@ namespace transport {
                 std::cerr << "параметр routing_settings не был обнаружен в файле " + test_in.string() << std::endl;
             }
 
-            std::ofstream out(out_log);
-            out << ss.str();
-            out.close();
+            std::ifstream in_standard(standard_out);
+            if(!in_standard.is_open()){
+                throw std::invalid_argument(" Ошибка: Такого файла не существует. Проверьте путь к файлу: "s + standard_out.string());
+            }
 
-            auto route_times = LoadRouteTime(ss);
-            auto test_route_time = LoadRouteTime(standard_out);
+            return CheckRouteTime(ss, in_standard, eps);
+        }
+
+        void TestFindingOptimalRoute(){
+            ASSERT(CheckFindingOptimalRoute("../tests/tsD_case/tsD_case_input.json"s,
+                                     "../tests/tsD_case/tsD_case_output.json"s))
+
+            ASSERT(CheckFindingOptimalRoute("../tests/tsE_case/tsE_case_input.json"s,
+                                            "../tests/tsE_case/tsE_case_output.json"s))
+
+            ASSERT(CheckFindingOptimalRoute("../tests/tsF_case/tsF_case_input.json"s,
+                                            "../tests/tsF_case/tsF_case_output.json"s))
+
+            ASSERT(CheckFindingOptimalRoute("../tests/tsG_case/tsG_case_input.json"s,
+                                            "../tests/tsG_case/tsG_case_output.json"s));
+
+            ASSERT(CheckFindingOptimalRoute("../tests/tsH_case/tsH_case_input.json"s,
+                                            "../tests/tsH_case/tsH_case_output.json"s));
+
+            ASSERT(CheckFindingOptimalRoute("../tests/tsI_case/tsI_case_input.json"s,
+                                            "../tests/tsI_case/tsI_case_output.json"s));
+
+            ASSERT(CheckFindingOptimalRoute("../tests/tsJ_case/tsJ_case_input.json"s,
+                                            "../tests/tsJ_case/tsJ_case_output.json"s))
+
+            ASSERT(CheckFindingOptimalRoute("../tests/tsK_case/tsK_case_input.json"s,
+                                            "../tests/tsK_case/tsK_case_output.json"s))
+
+            ASSERT(CheckFindingOptimalRoute("../tests/tsL_case/tsL_case_input.json"s,
+                                            "../tests/tsL_case/tsL_case_output.json"s))
+
+            ASSERT(CheckFindingOptimalRoute("../tests/tsM_case/tsM_case_input.json"s,
+                                            "../tests/tsM_case/tsM_case_output.json"s))
+        }
+
+        void CheckMakeBaseAndProcessRequests(const std::filesystem::path& make_test_in, const std::filesystem::path& requests_test_in,
+                                     const std::filesystem::path& standard_out, bool check_optimal_route){
+
+            auto error = [](const std::filesystem::path& file){
+                std::cerr << "Что-то пошло не так: файл  "s << file.string() << " - не открылся\n"s;
+            };
+
+            serialize::Serializer serializer;
+            {   // make_base
+                TransportCatalogue catalogue;
+                std::ifstream ifstream(make_test_in.string());
+                if(!ifstream.is_open()){ error(make_test_in); assert(false);}
+                auto [requests, render_settings, routing_settings, serialize_settings] = detail::ParseJson(ifstream, catalogue);
+                auto db_path = make_test_in.parent_path().append(serialize_settings->file_path.string());
+                std::ofstream ofstream(db_path, std::ios::binary);
+                if(!ofstream.is_open()){ error(db_path); assert(false); }
+                serializer.Serialize(catalogue, render_settings, routing_settings, ofstream);
+                ofstream.close();
+            }
+
+            std::stringstream ss;
+            {   // process_requests
+                TransportCatalogue catalogue;
+                std::ifstream ifstream_db(requests_test_in.string());
+                if(!ifstream_db.is_open()){ error(requests_test_in.string()); assert(false); }
+                auto [requests, render_settings, routing_settings, serialize_settings] = detail::ParseJson(ifstream_db, catalogue);
+                auto db_path = make_test_in.parent_path().append(serialize_settings->file_path.string());
+                std::ifstream ifstream(db_path, std::ios::binary);
+                if(!ifstream.is_open()){ error(db_path); assert(false);}
+                std::unique_ptr<transport::TransportRouter> router;
+                serializer.Deserialize(catalogue, render_settings, router, ifstream);
+                MapRenderer render(catalogue, render_settings);
+                if(router){
+                    routing_settings = router->GetSettings();
+                }
+                if(routing_settings.has_value()){
+                    PrintQuery(requests, catalogue, render, ss, router.get());
+                }else{
+                    PrintQuery(requests, catalogue, render, ss);
+                }
+                ifstream.close();
+            }
+
+            std::ifstream in_standard(standard_out);
             bool check = true;
-            for (size_t i = 0; i <  route_times.size(); ++i) {
-                if(std::abs(route_times[i] - test_route_time[i]) >= eps){
-                    std::cerr << " В " << i << " запросе на оптимальный маршрут есть различия в файлах " <<
-                    out_log.string() << " и " << standard_out.string() << "."
-                    << " Мой результат = " << route_times[i]
-                    << ", В тестах = " << test_route_time[i] << std::endl;
-                    check = false;
+
+            if(check_optimal_route){
+                check = CheckRouteTime(ss, in_standard);
+            }else{
+                for(std::size_t i = 0 ;!in_standard.eof(); ++i){
+                    std::string line_ss, line_standard;
+                    std::getline(ss, line_ss);
+                    std::getline(in_standard, line_standard);
+                    if(line_ss != line_standard){
+                        std::cerr << "строка " << i << "  Мой результат: " << line_ss << " Эталон: " << line_standard << std::endl;
+                        check = false;
+                    }
+                }
+                if(!check){
+                    std::cerr << "Файл " << standard_out << std::endl;
                 }
             }
             ASSERT(check)
         }
 
-        void TestFindingOptimalRoute(){
-            CheckFindingOptimalRoute("../tests/tsD_case/tsD_case_input.json"s,
-                                     "../tests/tsD_case/tsD_case_output.json"s,
-                                     "../tests/tsD_case/tsD_case_my_result.json"s);
+        void TestMakeBaseAndProcessRequestsModes(){
+            CheckMakeBaseAndProcessRequests("../tests/TestConsoleCommands/test1/make_base1.json",
+                                            "../tests/TestConsoleCommands/test1/process_requests1.json",
+                                            "../tests/TestConsoleCommands/test1/answer1.json");
 
-            CheckFindingOptimalRoute("../tests/tsE_case/tsE_case_input.json"s,
-                                     "../tests/tsE_case/tsE_case_output.json"s,
-                                     "../tests/tsE_case/tsE_case_my_result.json"s);
+            CheckMakeBaseAndProcessRequests("../tests/TestConsoleCommands/test2/make_base2.json",
+                                            "../tests/TestConsoleCommands/test2/process_requests2.json",
+                                            "../tests/TestConsoleCommands/test2/answer2.json");
 
-            CheckFindingOptimalRoute("../tests/tsF_case/tsF_case_input.json"s,
-                                     "../tests/tsF_case/tsF_case_output.json"s,
-                                     "../tests/tsF_case/tsF_case_my_result.json"s);
+            CheckMakeBaseAndProcessRequests("../tests/TestConsoleCommands/test3/make_base3.json",
+                                            "../tests/TestConsoleCommands/test3/process_requests3.json",
+                                            "../tests/TestConsoleCommands/test3/answer3.json");
 
-//            CheckFindingOptimalRoute("../tests/tsG_case/tsG_case_input.json"s,
-//                                     "../tests/tsG_case/tsG_case_output.json"s,
-//                                     "../tests/tsG_case/tsG_case_my_result.json"s);
+            CheckMakeBaseAndProcessRequests("../tests/TestConsoleCommands/test4/make_base4.json",
+                                            "../tests/TestConsoleCommands/test4/process_requests4.json",
+                                            "../tests/TestConsoleCommands/test4/answer4.json");
 
-            CheckFindingOptimalRoute("../tests/tsH_case/tsH_case_input.json"s,
-                                     "../tests/tsH_case/tsH_case_output.json"s,
-                                     "../tests/tsH_case/tsH_case_my_result.json"s);
+            CheckMakeBaseAndProcessRequests("../tests/TestConsoleCommands/test5/make_base5.json",
+                                            "../tests/TestConsoleCommands/test5/process_requests5.json",
+                                            "../tests/TestConsoleCommands/test5/answer5.json");
 
-            CheckFindingOptimalRoute("../tests/tsI_case/tsI_case_input.json"s,
-                                     "../tests/tsI_case/tsI_case_output.json"s,
-                                     "../tests/tsI_case/tsI_case_my_result.json"s);
+            CheckMakeBaseAndProcessRequests("../tests/TestConsoleCommands/test6/make_base6.json",
+                                            "../tests/TestConsoleCommands/test6/process_requests6.json",
+                                            "../tests/TestConsoleCommands/test6/answer6.json");
 
-            CheckFindingOptimalRoute("../tests/tsJ_case/tsJ_case_input.json"s,
-                                     "../tests/tsJ_case/tsJ_case_output.json"s,
-                                     "../tests/tsJ_case/tsJ_case_my_result.json"s);
+            CheckMakeBaseAndProcessRequests("../tests/TestConsoleCommands/test7/make_base7.json",
+                                            "../tests/TestConsoleCommands/test7/process_requests7.json",
+                                            "../tests/TestConsoleCommands/test7/answer7.json", true);
 
-            CheckFindingOptimalRoute("../tests/tsK_case/tsK_case_input.json"s,
-                                     "../tests/tsK_case/tsK_case_output.json"s,
-                                     "../tests/tsK_case/tsK_case_my_result.json"s);
+            CheckMakeBaseAndProcessRequests("../tests/TestConsoleCommands/test8/make_base8.json",
+                                            "../tests/TestConsoleCommands/test8/process_requests8.json",
+                                            "../tests/TestConsoleCommands/test8/answer8.json", true);
 
-            CheckFindingOptimalRoute("../tests/tsL_case/tsL_case_input.json"s,
-                                     "../tests/tsL_case/tsL_case_output.json"s,
-                                     "../tests/tsL_case/tsL_case_my_result.json"s);
-
-            CheckFindingOptimalRoute("../tests/tsM_case/tsM_case_input.json"s,
-                                     "../tests/tsM_case/tsM_case_output.json"s,
-                                     "../tests/tsM_case/tsM_case_my_result.json"s);
+            CheckMakeBaseAndProcessRequests("../tests/TestConsoleCommands/test9/make_base9.json",
+                                            "../tests/TestConsoleCommands/test9/process_requests9.json",
+                                            "../tests/TestConsoleCommands/test9/answer9.json", true);
         }
 
         void TestProject(){
@@ -1115,6 +1213,7 @@ namespace transport {
             RUN_TEST(test, TestParseOutputQuery);
             RUN_TEST(test, TestParseDistances);
             RUN_TEST(test, TestFindingOptimalRoute);
+            RUN_TEST(test, TestMakeBaseAndProcessRequestsModes);
         }
 
         void TestExamples(){

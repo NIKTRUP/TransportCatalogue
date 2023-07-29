@@ -106,10 +106,10 @@ namespace transport {
     }
 
     void TransportCatalogue::SetDistance(std::pair<const Stop*, const Stop*> pair_stops, size_t distance){
-        distance_stops[pair_stops] = distance;
+        distance_stops_[pair_stops] = distance;
         auto reverse = std::pair<const Stop*,const Stop*>{pair_stops.second, pair_stops.first};
-        if(distance_stops.count(reverse) == 0){
-            distance_stops[reverse] = distance;
+        if(distance_stops_.count(reverse) == 0){
+            distance_stops_[reverse] = distance;
         }
     }
 
@@ -126,7 +126,7 @@ namespace transport {
     }
 
     const TransportCatalogue::UnMapStopsToDistance& TransportCatalogue::GetDistancesStops() const{
-        return distance_stops;
+        return distance_stops_;
     }
 
     const TransportCatalogue::UnMapStopToBuses& TransportCatalogue::GetBusesOnStop() const{
@@ -150,7 +150,7 @@ namespace transport {
     }
 
     size_t TransportCatalogue::GetAmountStopsDistances() const {
-        return distance_stops.size();
+        return distance_stops_.size();
     }
 
     size_t TransportCatalogue::AtStopsDistance(const std::pair<std::string, std::string>& pair) const{
@@ -158,10 +158,10 @@ namespace transport {
     }
 
     size_t TransportCatalogue::AtStopsDistance(std::pair<const Stop*, const Stop*> stops) const{
-        if(distance_stops.count(stops) == 0 ){
+        if(distance_stops_.count(stops) == 0 ){
             throw std::out_of_range(" Расстояние между остановками неизвестно ");
         }
-        return distance_stops.at(stops);
+        return distance_stops_.at(stops);
     }
 
     size_t TransportCatalogue::AtStopsDistance(const Stop* begin, const Stop* end) const{
@@ -177,10 +177,10 @@ namespace transport {
     }
 
     std::optional<size_t> TransportCatalogue::GetStopsDistance(std::pair<const domain::Stop*, const domain::Stop*> stops) const{
-        if(distance_stops.count(stops) == 0 ){
+        if(distance_stops_.count(stops) == 0 ){
             return std::nullopt;
         }
-        return distance_stops.at(stops);
+        return distance_stops_.at(stops);
     }
 
     std::optional<size_t> TransportCatalogue::GetStopsDistance(const domain::Stop* begin, const domain::Stop* end) const{

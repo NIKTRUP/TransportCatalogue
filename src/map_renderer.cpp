@@ -4,7 +4,7 @@ namespace transport {
 
 using namespace std::literals;
 
-DictRenderer::DictRenderer(const TransportCatalogue& catalogue, const RenderSettings& settings):
+MapRenderer::MapRenderer(const TransportCatalogue& catalogue, const RenderSettings& settings):
     settings_(settings),
     catalogue_(catalogue){
 
@@ -35,7 +35,7 @@ DictRenderer::DictRenderer(const TransportCatalogue& catalogue, const RenderSett
 
 }
 
-   void DictRenderer::AddLines(const SphereProjector& projector) {
+   void MapRenderer::AddLines(const SphereProjector& projector) {
            size_t color = 0;
            for (const auto& name : route_names_) {
                auto route = catalogue_.FindBus(std::string(name));
@@ -62,7 +62,7 @@ DictRenderer::DictRenderer(const TransportCatalogue& catalogue, const RenderSett
            }
    }
 
-   void DictRenderer::AddRouteNames(const SphereProjector& projector) {
+   void MapRenderer::AddRouteNames(const SphereProjector& projector) {
        size_t color = 0;
        for (const auto& route_name : route_names_) {
            auto route = catalogue_.FindBus(route_name);
@@ -97,7 +97,7 @@ DictRenderer::DictRenderer(const TransportCatalogue& catalogue, const RenderSett
        }
    }
 
-   void DictRenderer::AddStopCircles(const SphereProjector& projector) {
+   void MapRenderer::AddStopCircles(const SphereProjector& projector) {
        for (const auto& stop : stop_names_) {
            auto stop_coordinates_proj = projector(catalogue_.FindStop(std::string(stop))->coordinate);
            svg::Circle circle_stop;
@@ -108,7 +108,7 @@ DictRenderer::DictRenderer(const TransportCatalogue& catalogue, const RenderSett
        }
    }
 
-   void DictRenderer::AddStopNames(const SphereProjector& projector) {
+   void MapRenderer::AddStopNames(const SphereProjector& projector) {
        for (const auto& stop : stop_names_) {
            auto stop_coordinates_proj = projector(catalogue_.FindStop(std::string(stop))->coordinate);
            svg::Text text_stop;
@@ -130,15 +130,15 @@ DictRenderer::DictRenderer(const TransportCatalogue& catalogue, const RenderSett
        }
    }
 
-   void DictRenderer::Print(std::ostream& out) const{
+   void MapRenderer::Print(std::ostream& out) const{
        render_.Render(out);
    }
 
-   const RenderSettings& DictRenderer::GetSettings() const{
+   const RenderSettings& MapRenderer::GetSettings() const{
        return settings_;
    }
 
-   const svg::Document& DictRenderer::GetDocument() const{
+   const svg::Document& MapRenderer::GetDocument() const{
        return render_;
    }
 

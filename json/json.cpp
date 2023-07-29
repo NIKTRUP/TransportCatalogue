@@ -1,7 +1,5 @@
 #include "../json/json.h"
 
-#include <iterator>
-
 namespace json {
 
 namespace {
