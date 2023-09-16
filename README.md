@@ -708,7 +708,7 @@ TransportCatalogue — система обработки и хранения т�
 
 <figure>
   <img
-  src="https://github.com/NIKTRUP/TransportCatalogue/assets/72292425/a60d2401-c36c-4342-96f7-245471b8ae6d"
+  src="https://github.com/NIKTRUP/TransportCatalogue/assets/72292425/e1a0f738-1e58-4975-ae96-e9666bf0745b"
   alt="Svg изображение не отобразилось">
   <figcaption>Схема будущего метро города Казань</figcaption>
 </figure>
