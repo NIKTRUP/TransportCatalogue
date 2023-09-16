@@ -1,88 +1,32 @@
-#ifndef DOMAIN_H
-#define DOMAIN_H
+#pragma once
+#include "geo.h"
 
 #include <string>
 #include <vector>
-#include <filesystem>
-#include <string_view>
-#include <unordered_set>
-#include "../include/geo.h"
 
-namespace transport {
+namespace transport_catalogue {
 
-    namespace domain {
-
-        /**
-            bus_wait_time — время ожидания автобуса на остановке, в минутах.
-            когда бы человек ни пришёл на остановку и какой бы ни была эта остановка,
-            он будет ждать любой автобус в точности указанное количество минут. Значение — натуральное число.
-            bus_velocity — скорость автобуса, в км/ч. Скорость любого автобуса постоянна и в точности равна указанному числу.
-            Время стоянки на остановках не учитывается, время разгона и торможения тоже.
-         */
-
-        struct SerializationSettings{
-            std::filesystem::path file_path;
-        };
-
-        struct RoutingSettings{
-            size_t bus_wait_time;
-            double  bus_velocity;
-        };
-
-        struct Stop{
-            std::string name;
-            geo::Coordinates coordinate;
-        };
-
-        bool operator==(const Stop &lhs, const Stop &rhs);
-
-        enum class RouteType {
-            UNKNOWN,
-            LINEAR,
-            CIRCLE,
-        };
-
-        struct RouteInfo {
-            std::string name;
-            RouteType route_type;
-            size_t stop_count = 0;
-            size_t unique_stop_count = 0;
-            double route_length_geo = 0;
-            double route_length = 0;
-            double curvature = 0.0;
-        };
-
-        struct Route{
-            std::string name;
-            RouteType route_type = RouteType::UNKNOWN;
-            std::vector<const Stop*> stops; // Остановки маршрута
-        };
-
-        bool operator==(const Route &lhs, const Route &rhs);
-
-        struct StopsHasher{
-            size_t operator() (const Stop* lhs, const Stop* rhs) const{
-                size_t lhs_link = hasher(lhs);
-                size_t rhs_link = hasher(rhs);
-
-                return lhs_link + rhs_link * 37;
-            }
-
-            size_t operator() (std::pair<const Stop*, const Stop*> pair) const{
-                return operator()(pair.first, pair.second);
-            }
-        private:
-            std::hash<const void*> hasher;
-        };
-
-        struct StopHasher{
-            size_t operator() (const Stop* stop) const{
-                return hasher(stop);
-            }
-        private:
-            std::hash<const void*> hasher;
-        };
+struct Stop {
+    Stop(std::string name, geo::Coordinates position)
+        : name(std::move(name))
+        , position(position) {
     }
-}
 
-#endif // DOMAIN_H
+    std::string name;
+    geo::Coordinates position;
+};
+using StopPtr = const Stop*;
+
+struct Bus {
+    Bus(std::string name, std::vector<StopPtr> stops, std::vector<StopPtr> endpoints)
+        : name(std::move(name))
+        , stops(std::move(stops))
+        , endpoints(std::move(endpoints)) {
+    }
+    std::string name;
+    std::vector<StopPtr> stops;
+    std::vector<StopPtr> endpoints;
+};
+using BusPtr = const Bus*;
+
+}  // namespace transport_catalogue

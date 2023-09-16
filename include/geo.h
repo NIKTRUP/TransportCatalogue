@@ -1,25 +1,12 @@
-#ifndef GEO_H
-#define GEO_H
-#define _USE_MATH_DEFINES
+#pragma once
 
-#include <cmath>
+namespace geo {
 
-namespace transport {
-    namespace geo {
+struct Coordinates {
+    double lat; // Широта
+    double lng; // Долгота
+};
 
-        struct Coordinates {
-            double lat;
-            double lng;
+double ComputeDistance(Coordinates from, Coordinates to);
 
-            bool operator==(const Coordinates& other) const {
-                return lat == other.lat && lng == other.lng;
-            }
-            bool operator!=(const Coordinates& other) const {
-                return !(*this == other);
-            }
-        };
-
-        double ComputeDistance(Coordinates from, Coordinates to);
-    }
-}
-#endif // GEO_H
+}  // namespace geo

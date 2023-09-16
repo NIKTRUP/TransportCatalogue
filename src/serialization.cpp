@@ -1,358 +1,500 @@
 #include "../include/serialization.h"
 
-namespace serialize {
+#include "../include/graph.h"
+#include "../include/map_renderer.h"
+#include "../include/router.h"
+#include "../svg/svg.h"
+#include "../include/transport_catalogue.h"
+#include "../include/transport_router.h"
 
-    namespace {
-        struct ReinterpretToSerializedColor {
-            [[nodiscard]] transport_serialize::Color operator() (std::monostate) const {
-                return transport_serialize::Color{};
-            }
-            [[nodiscard]] transport_serialize::Color operator() (const std::string& color) {
-                transport_serialize::Color color_serialize;
-                color_serialize.set_is_rgba(false);
-                color_serialize.set_name(color);
-                return color_serialize;
-            }
-            [[nodiscard]] transport_serialize::Color operator() (const svg::Rgb& color) {
-                transport_serialize::Rgba rgb;
-                rgb.set_red(color.red);
-                rgb.set_green(color.green);
-                rgb.set_blue(color.blue);
+#include <graph.pb.h>
+#include <map_renderer.pb.h>
+#include <svg.pb.h>
 
-                transport_serialize::Color color_serialize;
-                color_serialize.set_is_rgba(false);
-                *color_serialize.mutable_rgba() = std::move(rgb);
-                return color_serialize;
-            }
-            [[nodiscard]] transport_serialize::Color operator()(const svg::Rgba& color) {
-                transport_serialize::Rgba rgba;
-                rgba.set_red(color.red);
-                rgba.set_green(color.green);
-                rgba.set_blue(color.blue);
-                rgba.set_opacity(color.opacity);
+#include <cassert>
+#include <unordered_map>
+#include <utility>
+#include <variant>
 
-                transport_serialize::Color color_serialize;
-                color_serialize.set_is_rgba(true);
-                *color_serialize.mutable_rgba() = std::move(rgba);
-                return color_serialize;
-            }
-        };
+
+namespace transport_catalogue::serialization {
+
+namespace {
+
+svg_proto::Point SerializePoint(svg::Point point) {
+    svg_proto::Point proto;
+    proto.set_x(point.x);
+    proto.set_y(point.y);
+    return proto;
+}
+
+svg::Point DeserializePoint(const svg_proto::Point& proto) {
+    return {proto.x(), proto.y()};
+}
+
+svg_proto::Color SerializeColor(std::monostate) {
+    svg_proto::Color proto;
+    proto.set_is_none(true);
+    return proto;
+}
+
+svg_proto::Color SerializeColor(const std::string& name) {
+    svg_proto::Color proto;
+    proto.set_name(name);
+    return proto;
+}
+
+svg_proto::Color SerializeColor(const svg::Rgb& rgb) {
+    svg_proto::Color proto;
+    auto& rgba_proto = *proto.mutable_rgba();
+    rgba_proto.set_red(rgb.red);
+    rgba_proto.set_green(rgb.green);
+    rgba_proto.set_blue(rgb.blue);
+    return proto;
+}
+
+svg_proto::Color SerializeColor(const svg::Rgba& rgba) {
+    auto proto = SerializeColor(svg::Rgb{rgba.red, rgba.green, rgba.blue});
+    auto& rgba_proto = *proto.mutable_rgba();
+    rgba_proto.set_has_opacity(true);
+    rgba_proto.set_opacity(rgba.opacity);
+    return proto;
+}
+
+svg_proto::Color SerializeColor(const svg::Color& color) {
+    return std::visit(
+        [](const auto& color) { return SerializeColor(color); },
+        color
+    );
+}
+
+svg::Color DeserializeColor(const svg_proto::Color& proto) {
+    if (proto.is_none()) {
+        return svg::NoneColor;
     }
 
-    svg::Color ReinterpretToSvgColor(const transport_serialize::Color& color_deserialized){
-        svg::Color color;
-        if(!color_deserialized.name().empty()){
-            color = color_deserialized.name();
-        }else if(color_deserialized.is_rgba()){
-            color = svg::Rgba{static_cast<std::uint8_t>(color_deserialized.rgba().red()),
-                              static_cast<std::uint8_t>(color_deserialized.rgba().green()),
-                              static_cast<std::uint8_t>(color_deserialized.rgba().blue()),
-                              color_deserialized.rgba().opacity()};
-        }else{
-            color = svg::Rgb{static_cast<std::uint8_t>(color_deserialized.rgba().red()),
-                             static_cast<std::uint8_t>(color_deserialized.rgba().green()),
-                             static_cast<std::uint8_t>(color_deserialized.rgba().blue())};
-        }
-        return color;
+    if (!proto.has_rgba()) {
+        return proto.name();
     }
+
+    const auto& rgba_proto = proto.rgba();
+    const auto red = static_cast<uint8_t>(rgba_proto.red());
+    const auto green = static_cast<uint8_t>(rgba_proto.green());
+    const auto blue = static_cast<uint8_t>(rgba_proto.blue());
     
-    void Serializer::Serialize(const transport::TransportCatalogue& tc, const transport::RenderSettings& render,
-                               const std::optional<transport::domain::RoutingSettings>& routing_settings ,std::ostream& ostream){
-        transport_serialize::DataBase db;
-        auto& tc_serialize = *db.mutable_catalogue();
-        AddStopsToSerialize(tc_serialize, tc.GetStops());
-        AddRoutesToSerialize(tc_serialize, tc.GetRoutes());
-        AddDistancesToSerialize(tc_serialize, tc.GetDistancesStops());
-        AddRenderSettingsToSerialize(*db.mutable_render_settings(), render);
-        if(routing_settings.has_value()){
-            transport::TransportRouter router(tc, routing_settings.value());
-            AddTransportRouterToSerialize(*db.mutable_router(), router);
-        }
-
-        db.SerializeToOstream(&ostream);
-    }
-
-    void Serializer::Deserialize(transport::TransportCatalogue& tc, transport::RenderSettings& settings,
-                                 std::unique_ptr<transport::TransportRouter>& router, std::istream& istream){
-        transport_serialize::DataBase db;
-        db.ParseFromIstream(&istream);
-        tc = std::move(DeserializeTransportCatalogue(*db.mutable_catalogue()));
-        settings = std::move(DeserializeRenderSettings(*db.mutable_render_settings()));
-        if (db.has_router()) {
-            auto& tr_deserialize = *db.mutable_router();
-            auto& settings_deserialize = *tr_deserialize.mutable_settings();
-            transport::domain::RoutingSettings routing_settings = {settings_deserialize.bus_wait_time(), settings_deserialize.bus_velocity()};
-            const auto& [id_to_stop_name, stop_name_to_id] = DeserializeIndexMaps(tc, tr_deserialize);
-            auto graph = DeserializeGraph(tc, tr_deserialize);
-            auto routes_internal_data =  DeserializeInternalData(tr_deserialize);
-            router = std::make_unique<transport::TransportRouter>(tc, id_to_stop_name, stop_name_to_id, graph, routes_internal_data, routing_settings);
-        }
-    }
-
-    transport::TransportCatalogue Serializer::DeserializeTransportCatalogue(transport_serialize::TransportCatalogue& tc_deserialize) {
-        transport::TransportCatalogue tc;
-        auto &stops = *tc_deserialize.mutable_stops();
-        auto &routes = *tc_deserialize.mutable_routes();
-        auto &distances = *tc_deserialize.mutable_distances();
-
-        for (auto& stop: stops) {
-            tc.AddStop(std::move(transport::domain::Stop{stop.name(), stop.coordinates().lat(), stop.coordinates().lng()}));
-            id_to_stop_name_[stop.id()] = stop.name();
-        }
-
-        for (auto& distance: distances) {
-            tc.SetDistance({tc.FindStop(id_to_stop_name_.at(distance.id_from())),
-                            tc.FindStop(id_to_stop_name_.at(distance.id_to()))},
-                           distance.distance());
-        }
-
-        for (auto& route_deserialize: routes) {
-            transport::domain::Route route;
-            route.name = route_deserialize.name();
-            route.route_type = ReinterpretToDomainRouteType(route_deserialize.type());
-            route.stops.reserve(route_deserialize.stops_id_size());
-            for (auto& stop_id: *route_deserialize.mutable_stops_id()) {
-                route.stops.push_back(tc.FindStop(id_to_stop_name_.at(stop_id)));
-            }
-            tc.AddRoute(route);
-            id_to_route_name_[route_deserialize.id()] = route_deserialize.name();
-        }
-        return tc;
-    }
-
-    transport::RenderSettings Serializer::DeserializeRenderSettings(transport_serialize::RenderSettings& render_deserialize){
-        transport::RenderSettings settings;
-        settings.width = render_deserialize.width();
-        settings.height = render_deserialize.height();
-        settings.padding = render_deserialize.padding();
-        settings.line_width = render_deserialize.line_width();
-        settings.stop_radius = render_deserialize.stop_radius();
-        settings.bus_label_font_size = render_deserialize.bus_label_font_size();
-        settings.bus_label_offset = {render_deserialize.bus_label_offset().x(), render_deserialize.bus_label_offset().y()};
-        settings.stop_label_font_size = render_deserialize.stop_label_font_size();
-        settings.stop_label_offset = {render_deserialize.stop_label_offset().x(), render_deserialize.stop_label_offset().y()};
-        settings.underlayer_color = ReinterpretToSvgColor(*render_deserialize.mutable_underlayer_color());
-        settings.underlayer_width = render_deserialize.underlayer_width();
-        for(const auto& color: render_deserialize.color_palette()){
-            settings.color_palette.push_back(std::move(ReinterpretToSvgColor(color)));
-        }
-        settings.is_init = render_deserialize.is_init();
-        return settings;
-    }
-
-    std::pair<std::unordered_map<graph::VertexId, std::string_view>,
-            std::unordered_map<std::string_view, graph::VertexId>> Serializer::DeserializeIndexMaps(transport::TransportCatalogue& tc,
-                                                                                        transport_serialize::TransportRouter& tr_deserialize){
-        std::unordered_map<graph::VertexId, std::string_view> id_to_stop_name;
-        std::unordered_map<std::string_view, graph::VertexId> stop_name_to_id;
-        for (auto& p_stop_by_id : *tr_deserialize.mutable_stop_by_id()) {
-            const auto& stop = tc.FindStop(id_to_stop_name_.at(p_stop_by_id.stop_id()));
-            id_to_stop_name[p_stop_by_id.id()] = stop->name;
-            stop_name_to_id[stop->name] = p_stop_by_id.id();
-        }
-        return {id_to_stop_name,stop_name_to_id };
-    }
-
-    graph::DirectedWeightedGraph<transport::TransportWeight> Serializer::DeserializeGraph(transport::TransportCatalogue& tc,
-                                                                                          transport_serialize::TransportRouter& tr_deserialize){
-        std::vector<graph::Edge<transport::TransportWeight>> edges;
-        auto& graph_deserialize = *tr_deserialize.mutable_graph();
-        for (const auto& edge_deserialize : graph_deserialize.edges()) {
-            edges.push_back({edge_deserialize.from() , edge_deserialize.to(),
-                             { tc.FindBus(id_to_route_name_.at(edge_deserialize.weight().bus_id()))->name,
-                               edge_deserialize.weight().span_count(),
-                               edge_deserialize.weight().time()}});
-        }
-
-        std::vector<std::vector<graph::EdgeId>> incidence_lists;
-        for (auto i = 0; i < graph_deserialize.incidence_lists_size(); ++i) {
-            std::vector<graph::EdgeId> list;
-            auto &list_serialize = graph_deserialize.incidence_lists(i);
-            for (auto j = 0; j < list_serialize.edge_id_size(); ++j) {
-                list.push_back(list_serialize.edge_id(j));
-            }
-            incidence_lists.push_back(list);
-        }
-        return {edges, incidence_lists};
-    }
-
-    graph::Router<transport::TransportWeight>::RoutesInternalData Serializer::DeserializeInternalData(transport_serialize::TransportRouter& tr_deserialize){
-
-        using RouteInternalData = graph::Router<transport::TransportWeight>::RouteInternalData;
-
-        auto& router = *tr_deserialize.mutable_router();
-        graph::Router<transport::TransportWeight>::RoutesInternalData routes_internal_data;
-        routes_internal_data.reserve(router.rows_size());
-        for (auto& row : *router.mutable_rows()) {
-            std::vector<std::optional<RouteInternalData>> internal_data;
-            internal_data.reserve(row.cols_size());
-            for (auto& col : *row.mutable_cols()) {
-                if (col.optional_route_internal_data_case() == transport_serialize::OptionalRouteInternalData::kRouteInternalData) {;
-                    RouteInternalData route_data;
-                    auto& value = *col.mutable_route_internal_data();
-                    route_data.weight.time = value.time();
-                    if (value.optional_prev_edge_case() == transport_serialize::RouteInternalData::kEdgeId) {
-                        route_data.prev_edge = value.edge_id();
-                    }else{
-                        route_data.prev_edge = std::nullopt;
-                    }
-                    internal_data.emplace_back(route_data);
-                }else {
-                    internal_data.emplace_back(std::nullopt);
-                }
-            }
-            routes_internal_data.push_back(internal_data);
-        }
-        return routes_internal_data;
-    }
-
-    void Serializer::AddStopsToSerialize(transport_serialize::TransportCatalogue& catalogue_serialize,
-                                         const std::deque<transport::domain::Stop>& stops) {
-        uint32_t id = 0;
-        for (auto& [name, coordinate] : stops) {
-            auto& stop = *catalogue_serialize.add_stops();
-            stop.set_id(id);
-            stop.set_name(name);
-            auto& coord = *stop.mutable_coordinates();
-            coord.set_lat(coordinate.lat);
-            coord.set_lng(coordinate.lng);
-            stop_name_to_id_[name] = id;
-           ++id;
-        }
-    }
-
-    void Serializer::AddRoutesToSerialize(transport_serialize::TransportCatalogue& catalogue_serialize,
-                                          const std::deque<transport::domain::Route>& routers) {
-        uint32_t id = 0;
-        for (auto& [name, type, stops] : routers) {
-            auto& route_serialize = *catalogue_serialize.add_routes();
-            route_serialize.set_id(id);
-            route_serialize.set_name(name);
-            route_serialize.set_type(ReinterpretToSerializeRouteType(type));
-
-            for (const auto& stop : stops) {
-                route_serialize.add_stops_id(stop_name_to_id_.at(stop->name));
-            }
-            route_name_to_id_[name] = id;
-            ++id;
-        }
-    }
-
-    void Serializer::AddDistancesToSerialize(transport_serialize::TransportCatalogue& catalogue_serialize,
-                                             const std::unordered_map<std::pair<const transport::domain::Stop*,
-                                                     const transport::domain::Stop*>,
-                                                     size_t, transport::domain::StopsHasher>& distances){
-        for (auto& [stops, distance] : distances) {
-            auto& distance_serialize = *catalogue_serialize.add_distances();
-            distance_serialize.set_id_from(stop_name_to_id_.at(stops.first->name));
-            distance_serialize.set_id_to(stop_name_to_id_.at(stops.second->name));
-            distance_serialize.set_distance(distance);
-        }
-    }
-
-    void Serializer::AddTransportRouterToSerialize(transport_serialize::TransportRouter& router_serialize, const transport::TransportRouter& router){
-        AddGraphToSerialize(*router_serialize.mutable_graph(), router.GetGraph());
-        AddRouterToSerialize(router_serialize, router);
-    }
-
-    void Serializer::AddGraphToSerialize(transport_serialize::Graph& graph_serialize, const graph::DirectedWeightedGraph<transport::TransportWeight>& graph){
-        for (const auto& edge : graph.GetEdges()) {
-            auto& edge_serialize = *graph_serialize.add_edges();
-                edge_serialize.set_from(edge.from);
-                edge_serialize.set_to(edge.to);
-                auto& weight = *edge_serialize.mutable_weight();
-                    weight.set_bus_id(route_name_to_id_.at(edge.weight.bus_name));
-                    weight.set_span_count(edge.weight.span_count);
-                    weight.set_time(edge.weight.time);
-        }
-
-        for (const auto& list : graph.GetIncidenceLists()) {
-            auto& list_serialize = *graph_serialize.add_incidence_lists();
-            for (const auto id : list) {
-                list_serialize.add_edge_id(id);
-            }
-        }
-    }
-
-    void Serializer::AddRouterToSerialize(transport_serialize::TransportRouter& router_serialize, const transport::TransportRouter& router){
-        auto& settings = *router_serialize.mutable_settings();
-        settings.set_bus_wait_time(router.GetSettings().bus_wait_time);
-        settings.set_bus_velocity(router.GetSettings().bus_velocity);
-
-        for (const auto& [name, id] : router.GetStopNameToId()) {
-            auto& stop_id = *router_serialize.add_stop_by_id();
-            stop_id.set_id(id);
-            stop_id.set_stop_id(stop_name_to_id_.at(name));
-        }
-
-        for (const auto &rows : router.GetRoutesInternalData()) {
-            auto& p_data = *router_serialize.mutable_router()->add_rows();
-            for (const auto &cols : rows) {
-                auto& p_internal = *p_data.add_cols();
-                if (cols.has_value()) {
-                    auto &value = cols.value();
-                    auto& value_serialize = *p_internal.mutable_route_internal_data();
-                    value_serialize.set_time(value.weight.time);
-                    if (value.prev_edge.has_value()) {
-                        value_serialize.set_edge_id(value.prev_edge.value());
-                    }
-                }
-            }
-        }
-    }
-
-    void Serializer::AddRenderSettingsToSerialize(transport_serialize::RenderSettings& render_serialize,
-                                                  const transport::RenderSettings& render){
-        render_serialize.set_width(render.width);
-        render_serialize.set_height(render.height);
-        render_serialize.set_padding(render.padding);
-        render_serialize.set_line_width(render.line_width);
-        render_serialize.set_stop_radius(render.stop_radius);
-        render_serialize.set_bus_label_font_size(render.bus_label_font_size);
-        auto& bus_label_offset = *render_serialize.mutable_bus_label_offset();
-        bus_label_offset.set_x(render.bus_label_offset.x);
-        bus_label_offset.set_y(render.bus_label_offset.y);
-        render_serialize.set_stop_label_font_size(render.stop_label_font_size);
-        auto& stop_label_offset = *render_serialize.mutable_stop_label_offset();
-        stop_label_offset.set_x(render.stop_label_offset.x);
-        stop_label_offset.set_y(render.stop_label_offset.y);
-        *render_serialize.mutable_underlayer_color() = std::move(std::visit(ReinterpretToSerializedColor(), render.underlayer_color));
-        render_serialize.set_underlayer_width(render.underlayer_width);
-        for(const auto& color: render.color_palette){
-            *render_serialize.add_color_palette() = std::move(std::visit(ReinterpretToSerializedColor(), color));
-        }
-        render_serialize.set_is_init(render.is_init);
-    }
-
-    transport_serialize::RouteType Serializer::ReinterpretToSerializeRouteType(const transport::domain::RouteType& type){
-        transport_serialize::RouteType type_serialized;
-        switch (type) {
-            case transport::domain::RouteType::LINEAR :
-                type_serialized = transport_serialize::RouteType::LINEAR;
-                break;
-            case transport::domain::RouteType::CIRCLE :
-                type_serialized = transport_serialize::RouteType::CIRCLE;
-                break;
-            default:
-                type_serialized = transport_serialize::RouteType::UNKNOWN;
-                break;
-        }
-        return type_serialized;
-    }
-
-    transport::domain::RouteType Serializer::ReinterpretToDomainRouteType(const transport_serialize::RouteType& type_serialized){
-        transport::domain::RouteType type;
-        switch (type_serialized) {
-            case transport_serialize::RouteType::LINEAR :
-                type = transport::domain::RouteType::LINEAR;
-                break;
-            case transport_serialize::RouteType::CIRCLE :
-                type = transport::domain::RouteType::CIRCLE;
-                break;
-            default:
-                type = transport::domain::RouteType::UNKNOWN;
-                break;
-        }
-        return type;
+    if (rgba_proto.has_opacity()) {
+        return svg::Rgba{red, green, blue, rgba_proto.opacity()};
+    } else {
+        return svg::Rgb{red, green, blue};
     }
 }
+
+
+using StopIndices = std::unordered_map<StopPtr, uint32_t>;
+
+StopIndices BuildStopIndices(const TransportCatalogue& db) {
+    StopIndices stop_indices;
+    uint32_t index = 0;
+    for (const Stop& stop : db.GetStops()) {
+        stop_indices[&stop] = index++;
+    }
+    return stop_indices;
+}
+
+using BusIndices = std::unordered_map<BusPtr, uint32_t>;
+
+BusIndices BuildBusIndices(const TransportCatalogue& db) {
+    BusIndices bus_indices;
+    uint32_t index = 0;
+    for (const Bus& bus : db.GetBuses()) {
+        bus_indices[&bus] = index++;
+    }
+    return bus_indices;
+}
+
+transport_catalogue_proto::Catalogue SerializeTransportCatalogue(
+    const TransportCatalogue& db,
+    const StopIndices& stop_indices
+) {
+    transport_catalogue_proto::Catalogue db_proto;
+
+    for (const Stop& stop : db.GetStops()) {
+        transport_catalogue_proto::Stop& stop_proto = *db_proto.add_stops();
+        stop_proto.set_name(stop.name);
+        transport_catalogue_proto::Coordinates& position_proto = *stop_proto.mutable_position();
+        position_proto.set_latitude(stop.position.lat);
+        position_proto.set_longitude(stop.position.lng);
+    }
+
+    for (const Bus& bus : db.GetBuses()) {
+        transport_catalogue_proto::Bus& bus_proto = *db_proto.add_buses();
+        bus_proto.set_name(bus.name);
+        for (const StopPtr stop_ptr : bus.stops) {
+            bus_proto.add_stops(stop_indices.at(stop_ptr));
+        }
+        for (const StopPtr stop_ptr : bus.endpoints) {
+            bus_proto.add_endpoints(stop_indices.at(stop_ptr));
+        }
+    }
+
+    for (const auto [stop_pair, distance] : db.GetDistances()) {
+        const auto [stop_from, stop_to] = stop_pair;
+        transport_catalogue_proto::StopDistanceItem& item_proto = *db_proto.add_stop_distances();
+        item_proto.set_from(stop_indices.at(stop_from));
+        item_proto.set_to(stop_indices.at(stop_to));
+        item_proto.set_distance(distance);
+    }
+
+    return db_proto;
+}
+
+template <typename Stops>
+std::vector<StopPtr> DeserializeStops(
+    const TransportCatalogue::StopPool& stop_pool,
+    const Stops& proto_stops
+) {
+    std::vector<StopPtr> stops;
+    stops.reserve(proto_stops.size());
+    for (const uint32_t stop_index : proto_stops) {
+        stops.push_back(&stop_pool.at(stop_index));
+    }
+    return stops;
+}
+
+TransportCatalogue DeserializeTransportCatalogue(transport_catalogue_proto::Catalogue&& proto) {
+    TransportCatalogue db;
+
+    for (transport_catalogue_proto::Stop& stop_proto : *proto.mutable_stops()) {
+        const transport_catalogue_proto::Coordinates& position = stop_proto.position();
+        db.AddStop(std::move(*stop_proto.mutable_name()), {position.latitude(), position.longitude()});
+    }
+
+    const auto& stop_pool = db.GetStops();
+
+    for (transport_catalogue_proto::Bus& bus_proto : *proto.mutable_buses()) {
+        db.AddBus(
+            std::move(*bus_proto.mutable_name()),
+            DeserializeStops(stop_pool, bus_proto.stops()),
+            DeserializeStops(stop_pool, bus_proto.endpoints())
+        );
+    }
+
+    for (const transport_catalogue_proto::StopDistanceItem& stop_distance_item : proto.stop_distances()) {
+        db.SetDistance(
+            &stop_pool.at(stop_distance_item.from()),
+            &stop_pool.at(stop_distance_item.to()),
+            stop_distance_item.distance()
+        );
+    }
+
+    return db;
+}
+
+transport_catalogue_proto::RenderSettings SerializeRenderSettings(const renderer::RenderSettings& settings) {
+    transport_catalogue_proto::RenderSettings proto;
+    proto.set_max_width(settings.max_width);
+    proto.set_max_height(settings.max_height);
+    proto.set_padding(settings.padding);
+
+    for (const svg::Color& color : settings.palette) {
+        *proto.add_palette() = SerializeColor(color);
+    }
+
+    proto.set_line_width(settings.line_width);
+    *proto.mutable_underlayer_color() = SerializeColor(settings.underlayer_color);
+    proto.set_underlayer_width(settings.underlayer_width);
+    proto.set_stop_radius(settings.stop_radius);
+
+    *proto.mutable_bus_label_offset() = SerializePoint(settings.bus_label_offset);
+    proto.set_bus_label_font_size(settings.bus_label_font_size);
+    *proto.mutable_stop_label_offset() = SerializePoint(settings.stop_label_offset);
+    proto.set_stop_label_font_size(settings.stop_label_font_size);
+
+    return proto;
+}
+
+renderer::RenderSettings DeserializeRenderSettings(const transport_catalogue_proto::RenderSettings& proto) {
+    renderer::RenderSettings settings;
+    settings.max_width = proto.max_width();
+    settings.max_height = proto.max_height();
+    settings.padding = proto.padding();
+
+    settings.palette.reserve(proto.palette_size());
+    for (const auto& color : proto.palette()) {
+        settings.palette.push_back(DeserializeColor(color));
+    }
+
+    settings.line_width = proto.line_width();
+    settings.underlayer_color = DeserializeColor(proto.underlayer_color());
+    settings.underlayer_width = proto.underlayer_width();
+    settings.stop_radius = proto.stop_radius();
+
+    settings.bus_label_offset = DeserializePoint(proto.bus_label_offset());
+    settings.bus_label_font_size = proto.bus_label_font_size();
+    settings.stop_label_offset = DeserializePoint(proto.stop_label_offset());
+    settings.stop_label_font_size = proto.stop_label_font_size();
+
+    return settings;
+}
+
+transport_catalogue_proto::MapRenderer SerializeMapRenderer(
+    const renderer::MapRenderer& renderer,
+    const StopIndices& stop_indices
+) {
+    transport_catalogue_proto::MapRenderer proto;
+    *proto.mutable_render_settings() = SerializeRenderSettings(renderer.GetRenderSettings());
+
+    for (const auto [stop_ptr, coords] : renderer.GetStopsCoords()) {
+        auto& stop_coords_proto = *proto.add_stops_coords();
+        stop_coords_proto.set_stop(stop_indices.at(stop_ptr));
+        *stop_coords_proto.mutable_point() = SerializePoint(coords);
+    }
+
+    return proto;
+}
+
+renderer::MapRenderer DeserializeMapRenderer(
+    const transport_catalogue_proto::MapRenderer& proto,
+    const TransportCatalogue& db
+) {
+    renderer::MapRendererBuilder builder(DeserializeRenderSettings(proto.render_settings()), db);
+
+    for (const auto& stop_coords_proto : proto.stops_coords()) {
+        builder.SetStopCoords(
+            &db.GetStops().at(stop_coords_proto.stop()),
+            DeserializePoint(stop_coords_proto.point())
+        );
+    }
+
+    return std::move(builder).Build();
+}
+
+double ConvertWeightToDouble(double source) {
+    return source;
+}
+
+double ConvertWeightToDouble(router::Minutes source) {
+    return source.count();
+}
+
+template <typename Weight>
+Weight ConvertDoubleToWeight(double source) {
+    return Weight{source};
+}
+
+template <typename Weight>
+graph_proto::DirectedWeightedGraph SerializeGraph(const graph::DirectedWeightedGraph<Weight>& source_graph) {
+    graph_proto::DirectedWeightedGraph proto;
+
+    proto.set_vertex_count(source_graph.GetVertexCount());
+
+    for (graph::EdgeId edge_id = 0; edge_id < source_graph.GetEdgeCount(); ++edge_id) {
+        auto& edge_proto = *proto.add_edges();
+        const auto& edge = source_graph.GetEdge(edge_id);
+        edge_proto.set_from(edge.from);
+        edge_proto.set_to(edge.to);
+        edge_proto.set_weight(ConvertWeightToDouble(edge.weight));
+    }
+
+    return proto;
+}
+
+template <typename Weight>
+graph::DirectedWeightedGraph<Weight> DeserializeGraph(const graph_proto::DirectedWeightedGraph& proto) {
+    graph::DirectedWeightedGraph<Weight> target_graph(proto.vertex_count());
+
+    for (const auto& edge_proto : proto.edges()) {
+        graph::Edge<Weight> edge;
+        edge.from = edge_proto.from();
+        edge.to = edge_proto.to();
+        edge.weight = ConvertDoubleToWeight<Weight>(edge_proto.weight());
+        target_graph.AddEdge(edge);
+    }
+
+    return target_graph;
+}
+
+template <typename Weight>
+graph_proto::Router SerializeRouter(const graph::Router<Weight>& router) {
+    const auto& graph = router.GetGraph();
+    const size_t vertex_count = graph.GetVertexCount();
+    graph_proto::Router proto;
+
+    for (graph::VertexId from = 0; from < vertex_count; ++from) {
+        auto& source_data_proto = *proto.add_sources_data();
+        for (graph::VertexId to = 0; to < vertex_count; ++to) {
+            auto& route_data_proto = *source_data_proto.add_targets_data();
+            const auto* route_data = router.GetRouteInternalData(from, to);
+            if (route_data) {
+                route_data_proto.set_exists(true);
+                route_data_proto.set_weight(ConvertWeightToDouble(route_data->weight));
+                if (route_data->prev_edge) {
+                    route_data_proto.set_has_prev_edge(true);
+                    route_data_proto.set_prev_edge(*route_data->prev_edge);
+                }
+            }
+        }
+    }
+
+    return proto;
+}
+
+template <typename Weight>
+graph::Router<Weight> DeserializeRouter(const graph_proto::Router& proto, const graph::DirectedWeightedGraph<Weight>& target_graph) {
+    const size_t vertex_count = target_graph.GetVertexCount();
+    graph::RouterBuilder<Weight> builder(target_graph);
+
+    for (graph::VertexId from = 0; from < vertex_count; ++from) {
+        const auto& source_data_proto = proto.sources_data(from);
+        for (graph::VertexId to = 0; to < vertex_count; ++to) {
+            const auto& route_data_proto = source_data_proto.targets_data(to);
+            if (route_data_proto.exists()) {
+                typename graph::Router<Weight>::RouteInternalData route_data{
+                    ConvertDoubleToWeight<Weight>(route_data_proto.weight()),
+                    std::nullopt
+                };
+                if (route_data_proto.has_prev_edge()) {
+                    route_data.prev_edge = route_data_proto.prev_edge();
+                }
+                builder.SetRouteInternalData(from, to, route_data);
+            }
+        }
+    }
+
+    return std::move(builder).Build();
+}
+
+transport_catalogue_proto::RoutingSettings SerializeRoutingSettings(const router::RoutingSettings& settings) {
+    transport_catalogue_proto::RoutingSettings proto;
+    proto.set_bus_wait_time_minutes(settings.bus_wait_time.count());
+    proto.set_bus_velocity_kmh(settings.bus_velocity_kmh);
+    return proto;
+}
+
+router::RoutingSettings DeserializeRoutingSettings(const transport_catalogue_proto::RoutingSettings& proto) {
+    router::RoutingSettings settings;
+    settings.bus_wait_time = std::chrono::minutes(proto.bus_wait_time_minutes());
+    settings.bus_velocity_kmh = proto.bus_velocity_kmh();
+    return settings;
+}
+
+transport_catalogue_proto::TransportRouter SerializeTransportRouter(
+    const router::Router& transport_router,
+    const StopIndices& stop_indices,
+    const BusIndices& bus_indices
+) {
+    transport_catalogue_proto::TransportRouter proto;
+
+    *proto.mutable_routing_settings() = SerializeRoutingSettings(transport_router.GetRoutingSettings());
+
+    const auto& graph = transport_router.GetGraph();
+
+    *proto.mutable_graph() = SerializeGraph(graph);
+    *proto.mutable_router() = SerializeRouter(transport_router.GetRouter());
+
+    for (const auto [stop_ptr, stop_idx] : stop_indices) {
+        auto& vertex_ids_proto = *proto.add_stops_vertex_ids();
+        const auto& vertex_ids = transport_router.GetStopVertexIds(stop_ptr);
+        vertex_ids_proto.set_stop(stop_idx);
+        vertex_ids_proto.set_in(vertex_ids.in);
+        vertex_ids_proto.set_out(vertex_ids.out);
+    }
+
+    for (graph::VertexId vertex = 0; vertex < graph.GetVertexCount(); ++vertex) {
+        proto.add_vertices_info()->set_stop(stop_indices.at(transport_router.GetVertexInfo(vertex).stop_ptr));
+    }
+
+    for (graph::EdgeId edge = 0; edge < graph.GetEdgeCount(); ++edge) {
+        auto& edge_info_proto = *proto.add_edges_info();
+        const auto& edge_info = transport_router.GetEdgeInfo(edge);
+        if (std::holds_alternative<router::Router::BusEdgeInfo>(edge_info)) {
+            const auto& bus_edge_info = std::get<router::Router::BusEdgeInfo>(edge_info);
+            auto& bus_edge_info_proto = *edge_info_proto.mutable_bus_data();
+            bus_edge_info_proto.set_bus(bus_indices.at(bus_edge_info.bus_ptr));
+            bus_edge_info_proto.set_span_count(bus_edge_info.span_count);
+        } else {
+            edge_info_proto.mutable_wait_data();
+        }
+    }
+
+    return proto;
+}
+
+router::Router DeserializeTransportRouter(const transport_catalogue_proto::TransportRouter& proto, const TransportCatalogue& db) {
+    auto routing_settings = DeserializeRoutingSettings(proto.routing_settings());
+
+    using Weight = router::Minutes;
+    auto bus_graph = DeserializeGraph<Weight>(proto.graph());
+    router::RouterBuilder router_builder(std::move(routing_settings), std::move(bus_graph));
+
+    auto internal_router = DeserializeRouter<Weight>(proto.router(), router_builder.GetGraph());
+    router_builder.SetInternalRouter(std::move(internal_router));
+
+
+    const auto& stops = db.GetStops();
+    const auto& buses = db.GetBuses();
+
+    for (const auto& stop_vertex_ids_proto : proto.stops_vertex_ids()) {
+        router_builder.SetStopVertexIds(
+            &stops.at(stop_vertex_ids_proto.stop()),
+            {
+                stop_vertex_ids_proto.in(),
+                stop_vertex_ids_proto.out(),
+            }
+        );
+    }
+
+    graph::VertexId vertex = 0;
+    for (const auto& vertex_info_proto : proto.vertices_info()) {
+        router_builder.SetVertexInfo(vertex++, {&stops.at(vertex_info_proto.stop())});
+    }
+
+    graph::EdgeId edge = 0;
+    for (const auto& edge_info_proto : proto.edges_info()) {
+        if (edge_info_proto.has_bus_data()) {
+            const auto& bus_info_proto = edge_info_proto.bus_data();
+            router_builder.SetEdgeInfo(
+                edge,
+                router::Router::BusEdgeInfo{
+                    &buses.at(bus_info_proto.bus()),
+                    bus_info_proto.span_count(),
+                }
+            );
+        } else {
+            router_builder.SetEdgeInfo(edge, router::Router::WaitEdgeInfo{});
+        }
+        ++edge;
+    }
+
+    return std::move(router_builder).Build();
+}
+
+}  // namespace
+
+
+transport_catalogue_proto::TransportCatalogue SerializeUniverse(
+    const TransportCatalogue& db,
+    const renderer::MapRenderer& renderer,
+    const router::Router& router
+) {
+    transport_catalogue_proto::TransportCatalogue proto;
+
+    const auto stop_indices = BuildStopIndices(db);
+    const auto bus_indices = BuildBusIndices(db);
+    *proto.mutable_catalogue() = SerializeTransportCatalogue(db, stop_indices);
+    *proto.mutable_renderer() = SerializeMapRenderer(renderer, stop_indices);
+    *proto.mutable_router() = SerializeTransportRouter(router, stop_indices, bus_indices);
+
+    return proto;
+}
+
+std::tuple<TransportCatalogue, renderer::MapRenderer, router::Router> DeserializeUniverse(
+    transport_catalogue_proto::TransportCatalogue&& proto
+) {
+    TransportCatalogue db = DeserializeTransportCatalogue(std::move(*proto.mutable_catalogue()));
+    renderer::MapRenderer renderer = DeserializeMapRenderer(proto.renderer(), db);
+    router::Router transport_router = DeserializeTransportRouter(proto.router(), db);
+    return {std::move(db), std::move(renderer), std::move(transport_router)};
+}
+
+}  // namespace transport_catalogue::serialization

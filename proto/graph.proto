@@ -1,48 +1,29 @@
 syntax = "proto3";
 
-package transport_serialize;
-
-message TransportWeight {
-  uint32 bus_id = 1;
-  uint32 span_count = 2;
-  double time = 3;
-}
+package graph_proto;
 
 message Edge {
-  uint32 from = 1;
-  uint32 to = 2;
-  TransportWeight weight = 3;
+    uint32 from = 1;
+    uint32 to = 2;
+    double weight = 3;
 }
 
-message IncidenceList {
-  repeated uint32 edge_id = 1;
-}
-
-message Graph {
-  repeated Edge edges = 1;
-  repeated IncidenceList incidence_lists = 2;
+message DirectedWeightedGraph {
+    uint32 vertex_count = 1;
+    repeated Edge edges = 2;
 }
 
 message RouteInternalData {
-  double time = 1;
-  oneof optional_prev_edge {
-    uint32 edge_id = 2;
-  }
+    bool exists = 1;
+    double weight = 2;
+    bool has_prev_edge = 3;
+    uint32 prev_edge = 4;
 }
 
-// std::optional<RouteInternalData>
-message OptionalRouteInternalData {
-  oneof optional_route_internal_data {
-    RouteInternalData route_internal_data = 1;
-  }
+message RoutesInternalDataByTarget {
+    repeated RouteInternalData targets_data = 1;
 }
 
-// vector<std::optional<...>>
-message RoutesInternalDataCol {
-  repeated OptionalRouteInternalData cols = 1;
-}
-
-// vector<vector<...>>
 message Router {
-  repeated RoutesInternalDataCol rows = 1;
+    repeated RoutesInternalDataByTarget sources_data = 1;
 }

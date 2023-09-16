@@ -1,70 +1,27 @@
-#ifndef TRANSPORTCATALOGUE_SERIALIZATION_H
-#define TRANSPORTCATALOGUE_SERIALIZATION_H
-#include <filesystem>
-#include <fstream>
-#include "../include/transport_catalogue.h"
-#include "../include/transport_router.h"
-#include "../include/map_renderer.h"
 #include <transport_catalogue.pb.h>
-#include <transport_router.pb.h>
-#include <transport_router.pb.h>
-#include <utility>
+#include <tuple>
 
-namespace serialize{
-    class Serializer {
-    public:
-        Serializer() = default;
+namespace transport_catalogue {
 
-        void Serialize(const transport::TransportCatalogue& tc, const transport::RenderSettings& render,
-                                   const std::optional<transport::domain::RoutingSettings>& routing_settings ,std::ostream& ostream);
+class TransportCatalogue;
 
-        void Deserialize(transport::TransportCatalogue& tc, transport::RenderSettings& settings,
-                         std::unique_ptr<transport::TransportRouter>& router , std::istream& istream);
-    private:
+namespace renderer {
+class MapRenderer;
+}  // namespace renderer
 
-        transport::TransportCatalogue DeserializeTransportCatalogue(transport_serialize::TransportCatalogue& tc_deserialize);
+namespace router {
+class Router;
+}  // namespace renderer
 
-        transport::RenderSettings DeserializeRenderSettings(transport_serialize::RenderSettings& render_deserialize);
+namespace serialization {
 
-        std::pair<std::unordered_map<graph::VertexId, std::string_view>,
-                std::unordered_map<std::string_view, graph::VertexId>> DeserializeIndexMaps(transport::TransportCatalogue& tc,
-                                                                                            transport_serialize::TransportRouter& tr_deserialize);
+transport_catalogue_proto::TransportCatalogue SerializeUniverse(
+    const TransportCatalogue& db,
+    const renderer::MapRenderer& renderer,
+    const router::Router& router);
 
-        graph::DirectedWeightedGraph<transport::TransportWeight> DeserializeGraph(transport::TransportCatalogue& tc,
-                                                                                  transport_serialize::TransportRouter& tr_deserialize);
+std::tuple<TransportCatalogue, renderer::MapRenderer, router::Router> DeserializeUniverse(
+    transport_catalogue_proto::TransportCatalogue&& proto);
 
-        graph::Router<transport::TransportWeight>::RoutesInternalData DeserializeInternalData(transport_serialize::TransportRouter& tr_deserialize);
-
-        void AddStopsToSerialize(transport_serialize::TransportCatalogue& catalogue_serialize,
-                                 const std::deque<transport::domain::Stop>& stops);
-
-        void AddRoutesToSerialize(transport_serialize::TransportCatalogue& catalogue_serialize,
-                                  const std::deque<transport::domain::Route>& routers);
-
-        void AddDistancesToSerialize(transport_serialize::TransportCatalogue& catalogue_serialize,
-                                     const std::unordered_map<std::pair<const transport::domain::Stop*,
-                                             const transport::domain::Stop*>,
-                                             size_t, transport::domain::StopsHasher>& distances);
-
-        void AddTransportRouterToSerialize(transport_serialize::TransportRouter& router_serialize, const transport::TransportRouter& router);
-
-        void AddGraphToSerialize(transport_serialize::Graph& graph_serialize, const graph::DirectedWeightedGraph<transport::TransportWeight>& graph);
-
-        void AddRouterToSerialize(transport_serialize::TransportRouter& router_serialize, const transport::TransportRouter& router);
-
-        static void AddRenderSettingsToSerialize(transport_serialize::RenderSettings& render_serialize,
-                                                      const transport::RenderSettings& render);
-
-        static transport_serialize::RouteType ReinterpretToSerializeRouteType(const transport::domain::RouteType& type);
-
-        static transport::domain::RouteType ReinterpretToDomainRouteType(const transport_serialize::RouteType& type_serialized);
-
-        std::unordered_map<std::size_t , std::string_view> id_to_stop_name_;
-        std::unordered_map<std::string_view, std::size_t > stop_name_to_id_;
-
-        std::unordered_map<std::size_t , std::string_view> id_to_route_name_;
-        std::unordered_map<std::string_view, std::size_t > route_name_to_id_;
-    };
-}
-
-#endif //TRANSPORTCATALOGUE_SERIALIZATION_H
+}  // namespace serialization
+}  // namespace transport_catalogue

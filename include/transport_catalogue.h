@@ -1,99 +1,125 @@
+#pragma once
 
-#ifndef TRANSPORT_CATALOGUE_H
-#define TRANSPORT_CATALOGUE_H
+#include "domain.h"
 
-
-#include <cstdint>
 #include <deque>
-#include <set>
-#include <execution>
-#include <iostream>
+#include <stdexcept>
+#include <string_view>
 #include <unordered_map>
-#include <optional>
-#include "../include/domain.h"
-#include "../include/graph.h"
+#include <unordered_set>
 
-namespace transport {
+namespace transport_catalogue {
 
-    size_t CountStops(const domain::Route *route) noexcept;
+namespace detail {
 
-    size_t CountUniqueStops(const domain::Route *route) noexcept;
+struct PtrHasher {
+    template <typename T>
+    size_t operator()(const T* ptr) const {
+        return hasher(ptr);
+    }
 
-    double CalculateRouteLengthGeo(const domain::Route *route) noexcept;
+    std::hash<const void*> hasher;
+};
 
-    // Транспортный справочник
-    class TransportCatalogue{
+template <typename HasherL, typename HasherR>
+struct PairHasher {
+    template <typename T, typename S>
+    size_t operator()(const std::pair<T, S>& obj) const {
+        return hasher_l(obj.first) + 37 * hasher_r(obj.second);
+    }
 
-        using UnMapStopToBuses = std::unordered_map<std::string_view, std::set<std::string_view>>;
-        using UnMapNameToRoute = std::unordered_map<std::string_view, const domain::Route*>;
-        using UnMapNameToStop  = std::unordered_map<std::string_view, const domain::Stop*>;
-        using UnMapStopsToDistance = std::unordered_map<std::pair<const domain::Stop*, const domain::Stop*>, size_t, domain::StopsHasher>;
+    HasherL hasher_l;
+    HasherR hasher_r;
+};
 
-    public:
+}  // namespace detail
 
-       void AddStop(domain::Stop stop) noexcept;
+struct BusStat {
+    size_t total_stops = 0;
+    size_t unique_stops = 0;
+    double route_length = 0.;
+    double route_length_direct = 0.;
+};
 
-       const domain::Stop* FindStop(std::string_view name) const;
-       const domain::Stop* FindStop(const std::string& name) const;
+class TransportCatalogue {
+public:
+    using BusPool = std::deque<Bus>;
 
-       void AddRoute(domain::Route route) noexcept;
+    const BusPool& GetBuses() const {
+        return bus_pool_;
+    }
 
-       const domain::Route*  FindBus(std::string_view name) const;
-       const domain::Route*  FindBus(const std::string& name) const;
+    using StopPool = std::deque<Stop>;
 
-       domain::RouteInfo GetRouteInfo(const std::string& name) const ;
+    const StopPool& GetStops() const {
+        return stop_pool_;
+    }
 
-       std::optional<std::set<std::string_view>> GetBusesOnStop(const std::string& name) const;
+    StopPtr FindStop(std::string_view stop_name) const;
 
-       void SetDistance(std::pair<const domain::Stop*,const domain::Stop*> pair_stops, size_t distance);
-       void SetDistance(const domain::Stop* begin, const domain::Stop* end, size_t distance);
+    BusPtr FindBus(std::string_view bus_name) const;
 
-       const std::deque<domain::Stop>& GetStops() const;
+    void AddStop(std::string name, geo::Coordinates pos);
 
-       const std::deque<domain::Route>& GetRoutes() const;
+    void AddBus(std::string name, std::vector<StopPtr> stops, std::vector<StopPtr> endpoints);
 
-       const UnMapStopsToDistance& GetDistancesStops() const;
+    BusStat GetStat(BusPtr bus) const;
 
-       const UnMapStopToBuses& GetBusesOnStop() const;
+    const std::unordered_set<BusPtr>& GetBusesByStop(StopPtr stop) const;
 
-       const UnMapNameToRoute& GetRoutesByNames() const;
+    void SetDistance(StopPtr from, StopPtr to, int meters);
 
-       const UnMapNameToStop& GetStopsByNames() const;
+    int GetDistance(StopPtr from, StopPtr to) const;
 
-       size_t GetAmountStops() const;
+    int GetDistance(const std::string& from, const std::string& to) const;
 
-       size_t GetAmountRoutes() const;
+    using StopPair = std::pair<StopPtr, StopPtr>;
+    using StopPairHasher = detail::PairHasher<detail::PtrHasher, detail::PtrHasher>;
+    using Distances = std::unordered_map<StopPair, int, StopPairHasher>;
 
-       size_t GetAmountStopsDistances() const;
+    const Distances& GetDistances() const {
+        return distances_;
+    }
 
-       size_t AtStopsDistance(const std::pair<std::string, std::string>& pair) const;
-       size_t AtStopsDistance(std::pair<const domain::Stop*, const domain::Stop*> stops) const;
-       size_t AtStopsDistance(const domain::Stop* begin, const domain::Stop* end) const;
-       size_t AtStopsDistance(const std::string& begin, const std::string& end) const;
+private:
+    BusPool bus_pool_;
+    StopPool stop_pool_;
 
-       std::optional<size_t> GetStopsDistance(const std::pair<std::string, std::string>& pair) const;
-       std::optional<size_t> GetStopsDistance(std::pair<const domain::Stop*, const domain::Stop*> stops) const;
-       std::optional<size_t> GetStopsDistance(const domain::Stop* begin, const domain::Stop* end) const;
-       std::optional<size_t> GetStopsDistance(const std::string& begin, const std::string& end) const;
+    std::unordered_map<std::string_view, BusPtr> bus_by_name_;
+    std::unordered_map<std::string_view, StopPtr> stop_by_name_;
+    std::unordered_map<StopPtr, std::unordered_set<BusPtr>> bus_by_stop_;
 
-       size_t CalculateRouteLength(const domain::Route* route) const;
+    Distances distances_;
+};
 
-    private:
+class BuildError : public std::runtime_error {
+public:
+    using runtime_error::runtime_error;
+};
 
-       // остановки
-       std::deque<domain::Stop> stops_;
-       // Формат хранения: имя_остановки - указатель_на_остановку
-       UnMapNameToStop stops_by_name_;
-       // автобусы на каждой остановке. // Формат хранения: имя_остановки - множество_автобусов
-       UnMapStopToBuses buses_on_stop_;
-       // маршруты
-       std::deque<domain::Route> routes_;
-       // Формат хранения для поиска: имя_маршрута(совпадает с именем автобуса) - указатель на маршрут
-       UnMapNameToRoute routes_by_names_;
-       // расчёт расстояний между остановками (в метрах).
-       UnMapStopsToDistance distance_stops_;
+class TransportCatalogueBuilder {
+public:
+    struct BusDesc {
+        std::string name;
+        std::vector<std::string> stop_names;
+        bool is_roundtrip = false;
     };
 
-}
+    struct StopDesc {
+        std::string name;
+        double latitude = 0.0;
+        double longitude = 0.0;
+        std::vector<std::pair<std::string, int>> road_distances;
+    };
 
-#endif
+    TransportCatalogueBuilder& AddBus(BusDesc bus_desc);
+    TransportCatalogueBuilder& AddStop(StopDesc stop_desc);
+
+    [[nodiscard]] TransportCatalogue Build() const;
+
+private:
+    std::deque<BusDesc> bus_descriptions_;
+    std::deque<StopDesc> stop_descriptions_;
+};
+
+}  // namespace transport_catalogue

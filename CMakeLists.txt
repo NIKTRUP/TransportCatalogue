@@ -1,60 +1,52 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.10)
 
-project(TransportCatalogue)
+project(TransportCatalogue CXX)
 set(CMAKE_CXX_STANDARD 17)
 
+# Эта команда найдёт собранный нами пакет Protobuf.
+# REQUIRED означает, что библиотека обязательна.
+# Путь для поиска укажем в параметрах команды cmake.
 find_package(Protobuf REQUIRED)
 find_package(Threads REQUIRED)
 
+# Команда вызова protoc. 
+# Ей переданы названиия переменных, в которые будут сохранены 
+# списки сгенерированных файлов, а также сам proto-файл.
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS
-        proto/transport_catalogue.proto
-        proto/svg.proto
-        proto/map_renderer.proto
-        proto/graph.proto
-        proto/transport_router.proto)
+    ./proto/transport_catalogue.proto
+    ./proto/map_renderer.proto
+    ./proto/svg.proto
+    ./proto/transport_router.proto
+    ./proto/graph.proto
+)
 
-set(FILES_INCLUDE include/domain.h
-        include/geo.h
-        include/log_duration.h
-        include/map_renderer.h
-        include/request_handler.h
-        include/json_reader.h
-        include/test_framework.h
-        include/tests.h
-        include/transport_catalogue.h
-        include/graph.h
-        include/ranges.h
-        include/router.h
-        include/transport_router.h
-        include/serialization.h)
+file(GLOB SOURCES ./src/*.cpp)
+file(GLOB INCLUDES ./include/*.h)
+file(GLOB SVG ./svg/*.h ./svg/*.cpp)
+file(GLOB JSON ./json/*.h ./json/*.cpp)
 
-set(FILES_SOURCE src/domain.cpp
-        src/geo.cpp
-        src/map_renderer.cpp
-        src/request_handler.cpp
-        src/json_reader.cpp
-        src/tests.cpp
-        src/transport_catalogue.cpp
-        src/transport_router.cpp
-        src/serialization.cpp)
+# добавляем цель - transport_catalogue
+add_executable(
+    transport_catalogue
+    ${PROTO_SRCS}
+    ${PROTO_HDRS}
+    main.cpp
+    ${SOURCES}
+    ${INCLUDES}
+    ${SVG}
+    ${JSON}
+)
 
-set(FILES_JSON json/json.h
-        json/json.cpp
-        json/json_builder.h
-        json/json_builder.cpp)
+# find_package определила переменную Protobuf_INCLUDE_DIRS,
+# которую нужно использовать как include-путь.
+# Также нужно добавить как include-путь директорию, куда
+# protoc положит сгенерированные файлы.
+target_include_directories(transport_catalogue PUBLIC ${Protobuf_INCLUDE_DIRS})
+target_include_directories(transport_catalogue PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
-set(FILES_SVG svg/svg.h
-        svg/svg.cpp)
-
-set(PROJECT_NAME TransportCatalogue)
-
-add_executable(${PROJECT_NAME} main.cpp ${PROTO_SRCS} ${PROTO_HDRS} ${FILES_JSON} ${FILES_SVG} ${FILES_INCLUDE} ${FILES_SOURCE})
-
-target_include_directories(${PROJECT_NAME} PUBLIC ${Protobuf_INCLUDE_DIRS})
-target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-
+# Также find_package определила Protobuf_LIBRARY и Protobuf_LIBRARY_DEBUG.
+# Исправим некорректное значение Protobuf_LIBRARY_DEBUG операцией замены:
 string(REPLACE "protobuf.lib" "protobufd.lib" "Protobuf_LIBRARY_DEBUG" "${Protobuf_LIBRARY_DEBUG}")
 string(REPLACE "protobuf.a" "protobufd.a" "Protobuf_LIBRARY_DEBUG" "${Protobuf_LIBRARY_DEBUG}")
 
-target_link_libraries(${PROJECT_NAME} "$<IF:$<CONFIG:Debug>,${Protobuf_LIBRARY_DEBUG},${Protobuf_LIBRARY}>" Threads::Threads)
-target_link_libraries(${PROJECT_NAME} -ltbb -lpthread)
+target_link_libraries(transport_catalogue $<IF:$<CONFIG:Debug>,${Protobuf_LIBRARY_DEBUG},${Protobuf_LIBRARY}> Threads::Threads)

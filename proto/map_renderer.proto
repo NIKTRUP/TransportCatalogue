@@ -1,22 +1,30 @@
 syntax = "proto3";
 
-package transport_serialize;
-
 import "svg.proto";
 
-message RenderSettings {
-  double width = 1;
-  double height = 2;
-  double padding = 3;
-  double line_width = 4;
-  double stop_radius = 5;
-  int32 bus_label_font_size = 6;
-  Point bus_label_offset = 7;
-  int32 stop_label_font_size = 8;
-  Point stop_label_offset = 9;
-  Color underlayer_color = 10;
-  double underlayer_width = 11;
-  repeated Color color_palette = 12;
+package transport_catalogue_proto;
 
-  bool is_init = 13;
+message RenderSettings {
+    double max_width = 1;
+    double max_height = 2;
+    double padding = 3;
+    repeated svg_proto.Color palette = 4;
+    double line_width = 5;
+    svg_proto.Color underlayer_color = 6;
+    double underlayer_width = 7;
+    double stop_radius = 8;
+    svg_proto.Point bus_label_offset = 9;
+    int32 bus_label_font_size = 10;
+    svg_proto.Point stop_label_offset = 11;
+    int32 stop_label_font_size = 12;
+}
+
+message StopCoords {
+    uint32 stop = 1;
+    svg_proto.Point point = 2;
+}
+
+message MapRenderer {
+    RenderSettings render_settings = 1;
+    repeated StopCoords stops_coords = 2;
 }
