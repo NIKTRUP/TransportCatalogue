@@ -229,7 +229,8 @@ TransportCatalogue — система обработки и хранения т�
 } 
 ```
 Ключ `map` — строка с изображением карты в формате `SVG`
-![124977269-f6e62380-e038-11eb-80de-2ba6bfa1e1d8](https://github.com/NIKTRUP/cpp-transport-catalogue/assets/72292425/a6d69885-57f9-4df6-8f9f-a9125788c170)
+
+![124977269-f6e62380-e038-11eb-80de-2ba6bfa1e1d8](https://github.com/NTG-TPL/TransportCatalogue/assets/72292425/f00ab035-6b90-41fc-abbe-af6cd423ae9c)
 
 
 
@@ -709,7 +710,7 @@ TransportCatalogue — система обработки и хранения т�
 
 <figure>
   <img
-  src="https://github.com/NIKTRUP/TransportCatalogue/assets/72292425/e1a0f738-1e58-4975-ae96-e9666bf0745b"
+  src="https://github.com/NTG-TPL/TransportCatalogue/assets/72292425/e1a0f738-1e58-4975-ae96-e9666bf0745b"
   alt="Svg изображение не отобразилось">
   <figcaption>Схема будущего метро города Казань</figcaption>
 </figure>
